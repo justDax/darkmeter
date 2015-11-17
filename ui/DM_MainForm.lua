@@ -43,7 +43,7 @@ end
 
 -- closes the main window, all subwindows and remove event listeners
 function MainForm.controls:OnCancel()
-  Print("TODO: Close window and pause the addon")
+  DarkMeter:pause()
 end
 
 

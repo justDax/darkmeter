@@ -78,21 +78,25 @@ end
 
 -- stops fight (combat end)
 function Fight:stop()
-  self.endTime = GameLib.GetGameTime()
-  self.totalDuration = self.totalDuration + (self.endTime - self.startTime)
+  if not self.endTime then
+    self.endTime = GameLib.GetGameTime()
+    self.totalDuration = self.totalDuration + (self.endTime - self.startTime)
 
-  for id, unit in pairs(self.groupMembers) do
-    unit:stopFight()
+    for id, unit in pairs(self.groupMembers) do
+      unit:stopFight()
+    end
   end
 end
 
 
 -- continue a fight, used to keep adding time to the overall fight between combats
 function Fight:continue()
-  self.startTime = GameLib.GetGameTime()
-  self.endTime = nil
-  for id, unit in pairs(self.groupMembers) do
-    unit:startFight()
+  if self.endTime then
+    self.startTime = GameLib.GetGameTime()
+    self.endTime = nil
+    for id, unit in pairs(self.groupMembers) do
+      unit:startFight()
+    end
   end
 end
 

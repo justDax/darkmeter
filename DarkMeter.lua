@@ -5,7 +5,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.2.0"
+DarkMeter.version = "0.2.1"
 
 
 
@@ -56,7 +56,7 @@ DarkMeter.settings = {
 }
 
 DarkMeter.specificFight = nil 					-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
-
+DarkMeter.paused = false
 
 -- list containing all events to register/unregister
 local combatLogEvents = {
@@ -70,8 +70,7 @@ local combatLogEvents = {
 	"CombatLogFallingDamage",
 	"CombatLogReflect",
 	"CombatLogMultiHitShields",
-	"CombatLogDamageShields",
-	"UnitEnteredCombat"
+	"CombatLogDamageShields"
 }
 
 -----------------------------------------------------------------------------------------------
@@ -118,16 +117,23 @@ function DarkMeter:OnLoad()
 
 
 	-- slash commands
-	Apollo.RegisterSlashCommand("dm", "toggle", UI)
-	Apollo.RegisterSlashCommand("darkmeter", "toggle", UI)
+	Apollo.RegisterSlashCommand("dm", "toggle", self)
+	Apollo.RegisterSlashCommand("darkmeter", "toggle", self)
 	
 	-- asks it the user wants to reset the data on world change
 	Apollo.RegisterEventHandler("ChangeWorld", "promptResetData", UI)
+	-- TODO - sometimes the group bugs when changing zone, pheraps the unit does't exists yet on the moment this event gets called? I need to test this one
+	-- TODO - I might need to add a delay to the group update then...
 	Apollo.RegisterEventHandler("ChangeWorld", "updateGroup", self)
 
 	for i = 1, #combatLogEvents do
 		Apollo.RegisterEventHandler(combatLogEvents[i], "On" .. combatLogEvents[i], DarkMeter)
 	end
+
+	-- this event must be handled even if the addon is paused to detect if the group exit combat
+	-- in case this happens, it means that the addon has been paused in the middle of a fight that is now over and I need to instantiate a new currentFight when the addon is resumed
+	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", DarkMeter)
+
 
 	Apollo.CreateTimer("MainFormRefresher", 1, true)
 	Apollo.RegisterTimerHandler("MainFormRefresher", "OnMainFormRefresher", self)
@@ -206,12 +212,22 @@ end
 
 
 -- pause DarkMeter
--- removes combat log event handlers
+-- removes combat log event handlers, hides ui and pause fights
 function DarkMeter:pause()
 	for i = 1, #combatLogEvents do
 		Apollo.RemoveEventHandler(combatLogEvents[i], DarkMeter)
 	end
 	Apollo.StopTimer("MainFormRefresher")
+	
+	-- pause all the fights
+	-- if the combat ends while the addon is paused, currentFight should be archived and set to nil as usual
+	for _, fight in pairs({currentFight, overallFight}) do
+		fight:stop()
+	end
+
+	self.paused = true
+	UI:hide()
+
 end
 
 function DarkMeter:resume()
@@ -219,6 +235,22 @@ function DarkMeter:resume()
 		Apollo.RegisterEventHandler(combatLogEvents[i], "On" .. combatLogEvents[i], DarkMeter)
 	end
 	Apollo.StartTimer("MainFormRefresher")
+
+	-- resume the fight if the group is in combat
+	if Group:inCombat() then
+		self:startCombatIfNecessary()
+	end
+
+	self.paused = false
+	UI:show()
+end
+
+function DarkMeter:toggle()
+	if self.paused then
+		self:resume()
+	else
+		self:pause()
+	end
 end
 
 
@@ -462,6 +494,8 @@ function DarkMeter:startCombatIfNecessary()
 	if not currentFight then
 		currentFight = Fight:new()
 		currentFight.forcedName = "Current fight"
+	elseif currentFight:paused() then
+		currentFight:continue()
 	end
 	if not overallFight then
 		overallFight = Fight:new()
@@ -475,13 +509,14 @@ end
 function DarkMeter:stopCurrentFight()
 	currentFight:stop()
 	overallFight:stop()
+
 	currentFight.forcedName = nil
 	-- check that the fight has at least a member to prevent inserting fights when nothing happens (a mob that aggro then evades without hitting)
 	if DMUtils.tableLength(currentFight.groupMembers) > 0 then
 		table.insert(fightsArchive, 1, DMUtils.cloneTable(currentFight))
 	end
 	currentFight = nil
-	-- after 0.5 sec call an updateUI to check if the interface needs an update
+	-- after 0.6 sec call an updateUI to check if the interface needs an update
 	ApolloTimer.Create(0.6, false, "updateUI", DarkMeter)
 end
 

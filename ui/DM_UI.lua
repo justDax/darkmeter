@@ -190,15 +190,6 @@ function UI:hide()
   MainForm.form:Show(false)
 end
 
--- toggle main window
-function UI:toggle()
-  if MainForm.visible then
-    self:hide()
-  else
-    self:show()
-  end
-end
-
 -- prompt reset data, used inside DarkMeter on worldchange
 function UI:promptResetData()
   ResetForm:show()
