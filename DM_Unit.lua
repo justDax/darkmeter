@@ -117,41 +117,12 @@ function Unit:addSkillTaken(skill)
 end
 
 
--- -- returns total damage done as a number
--- function Unit:damageDone()
---   local dmg = 0
---   for k, v in pairs(self.skills) do
---     dmg = dmg + v.damageDone
---   end
---   return dmg
--- end
+------------------------------------------
+--   skills processing functons
+------------------------------------------
+-- those functions sum all the player's skills and return a number
+-- representing the amount of this unit's stat (like damageDone for example)
 
--- -- returns total damage done as a number
--- function Unit:healingDone()
---   local heal = 0
---   for k, v in pairs(self.skills) do
---     heal = heal + v.healingDone
---   end
---   return heal
--- end
-
--- -- returns total damage done as a number
--- function Unit:overhealDone()
---   local oheal = 0
---   for k, v in pairs(self.skills) do
---     oheal = oheal + v.overhealDone
---   end
---   return oheal
--- end
-
--- -- returns totalinterrupts as a number
--- function Unit:interrupts()
---   local total = 0
---   for k, v in pairs(self.skills) do
---     total = total + v.interrupts
---   end
---   return total
--- end
 
 -- returns damage taken
 function Unit:damageTaken()
@@ -164,8 +135,10 @@ function Unit:damageTaken()
   return total
 end
 
+
 local stats = {"damageDone", "healingDone", "overhealDone", "interrupts"}
 
+-- define functions to return the stats in this array, since they share the same logic
 for i = 1, #stats do
   Unit[stats[i]] = function(unit)
     local total = 0
@@ -191,6 +164,48 @@ function Unit:dps()
     return math.floor( self:damageDone() / self:fightDuration() )
   else
     return 0
+  end
+end
+
+
+------------------------------------------
+--   skills order function
+------------------------------------------
+-- those functions will sort all unit's skills based on their contribution to a particolar stat score and return them as an array
+-- all the skills that give 0 contribution to that stat are excluded from the resulting array
+
+
+for i = 1, #stats do
+  Unit[stats[i] .. "Skills"] = function(unit)
+    local tmp = {}
+
+    local function sortFunct(a, b)
+      return a[stats[i]] > b[stats[i]]
+    end
+
+    for k, skill in pairs(unit.skills) do
+      local amount = skill[stats[i]]
+      if amount > 0 then
+        table.insert(tmp, skill)
+      end
+    end
+
+    -- add pet's skills if pets are merged with the owner
+    if DarkMeter.settings.mergePets then
+      for n, pet in pairs(unit.pets) do
+        for k, skill in pairs(pet.skills) do
+          local amount = skill[stats[i]]
+          if amount > 0 then
+            table.insert(tmp, skill)
+          end
+        end
+      end
+    end
+
+    if #tmp > 1 then
+      table.sort(tmp, sortFunct)
+    end
+    return tmp
   end
 end
 

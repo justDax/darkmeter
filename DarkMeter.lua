@@ -5,7 +5,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.2.1"
+DarkMeter.version = "0.2.2"
 
 
 
@@ -387,6 +387,8 @@ function CombatUtils:formatCombatAction(e, customValues)
 	end
 	
 	customValues = customValues or {}
+
+	-- initialize common useful values
 	local event = {
 		state = e.eCombatResult,
 		multihit = false,
@@ -398,23 +400,27 @@ function CombatUtils:formatCombatAction(e, customValues)
 		targetkilled = e.bTargetKilled
 	}
 
+	-- add info about the caster
 	if e.unitCaster then
 		event.caster = e.unitCaster
 		event.casterId = e.unitCaster:GetId()
 		event.casterName = e.unitCaster:GetName()
 	end
 
+	-- add info about the target
 	if e.unitTarget then
 		event.target = e.unitTarget
 		event.targetId = e.unitTarget:GetId()
 		event.targetName = e.unitTarget:GetName()
 	end
 
+	-- add info on the spell itself
 	if e.splCallingSpell then
 		event.spell = e.splCallingSpell
 		event.name = e.splCallingSpell:GetName()
 	end
 
+	-- add pet info
 	if event.owner then
 		event.ownerId = event.owner:GetId()
 		event.ownerName = event.owner:GetName()

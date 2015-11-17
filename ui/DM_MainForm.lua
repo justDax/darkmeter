@@ -23,6 +23,9 @@ function MainForm:init(xmlDoc)
   DarkMeter = Apollo.GetAddon("DarkMeter")
 
   MainForm.form = Apollo.LoadForm(xmlDoc, "DarkMeterForm", nil, MainForm.controls)
+  MainForm.tooltip = Apollo.LoadForm(xmlDoc, "TooltipForm", nil, MainForm.tooltipControls)
+  MainForm.tooltip:Show(false)
+
   -- set main parts
   self.header = self.form:FindChild("Header")
   self.wrapper = self.form:FindChild("ContentWrapper")
@@ -191,6 +194,10 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
   local stats = DarkMeter.settings.selectedStats
   local options = {}
 
+  -- set unit and stat reference
+  options.unit = unit
+  options.stat = stats[column]
+
   -- set rank
   if rank ~= nil and column == 1 then
     options.rank = rank
@@ -340,6 +347,132 @@ function MainForm:showGroupStats()
 
   UI.lastUpdate = GameLib.GetGameTime()
 end
+
+
+
+-------------------------------------------------------------
+-- MainForm row hover functions 
+-------------------------------------------------------------
+
+MainForm.tooltipControls = {}
+MainForm.tooltipControls.visible = false
+
+function MainForm.tooltipControls:hide()
+  if MainForm.tooltipControls.visible then
+    MainForm.tooltip:Show(false)
+    MainForm.tooltipControls.visible = false
+  end
+end
+
+function MainForm.tooltipControls:show()
+  if not MainForm.tooltipControls.visible then
+    MainForm.tooltip:Show(true)
+    MainForm.tooltipControls.visible = true
+  end
+end
+
+function MainForm.tooltipControls:move(x, y)
+  if x then
+    local width = MainForm.tooltip:GetWidth()
+    local height = MainForm.tooltip:GetHeight()
+    if not y then
+      local top
+      top, y = MainForm.tooltip:GetAnchorOffsets()
+      y = y + height
+    end
+    MainForm.tooltip:SetAnchorOffsets( (x - width/2), (y - height), (x + width/2), y)
+  end
+end
+
+
+
+-- set tooltip window text
+function MainForm.tooltipControls:setText(lines)
+  -- sets header
+  local header = MainForm.tooltip:FindChild("Header")
+  if lines.title then
+    header:SetText(lines.title)
+  else
+    header:SetText("DarkMeter")
+  end
+
+  -- sets lines
+  local mainStats = MainForm.tooltip:FindChild("MainStats")
+  for i = 1, 3 do
+    local lineWnd = mainStats:FindChild("Text" .. i)
+    if lines[i] then
+      lineWnd:SetText(lines[i])
+    else
+      lineWnd:SetText("")
+    end
+  end
+end
+
+
+-- handles mouseenter on rows, builds the data to show into the tooltip window and shows it
+function MainForm.controls:OnRowMouseEnter(wndH, wndC, x, y)
+  if wndH == wndC then
+    local data = wndH:GetData()
+    local unit = data.unit
+    local stat = data.stat
+    local totalStat = unit[stat](unit)
+    local lines = {}
+
+    if unit[stat.."Skills"] ~= nil then
+      local skills = unit[stat.."Skills"](unit)
+      lines.title = DMUtils:titleForStat(stat, false)
+
+      -- for the first 3 skills pull name, flat stat and contribution percentage to the overall value of the stat
+      for i = 1, 3 do
+        local skill = skills[i]
+        if skill then
+          local skillValue = skill:dataFor(stat)
+          local percentage = DMUtils.roundToNthDecimal( (skillValue / totalStat * 100), 1)
+          
+          lines[i] = percentage .. "%" .. " - " .. skill.name
+          if skill.ownerName then
+            lines[i] = lines[i] .. " (" .. skill.casterName .. ")"
+          end
+        end
+      end
+
+      -- This is just ugly, but as I understand there's no other way to get a chil'd position relative to the game window
+      -- so I have to iterate through and sud their relative offset top
+      local totalTop = 0
+      local win = wndH
+      while win do
+        local left, top, right, bottom = win:GetAnchorOffsets()
+        totalTop = totalTop + top
+        win = win:GetParent()
+      end
+      
+
+      MainForm.tooltipControls:setText(lines)
+      MainForm.tooltipControls:show()
+      local mousePos = Apollo.GetMouse()
+      MainForm.tooltipControls:move(mousePos.x, totalTop)
+    end
+  end
+end
+
+function MainForm.controls:OnRowMouseMove(wndH, wndC, x, y)
+  if wndH == wndC then
+    local mousePos = Apollo.GetMouse()
+    MainForm.tooltipControls:move(mousePos.x, false)
+  end
+end
+
+
+function MainForm.controls:OnRowMouseExit(wndH, wndC, x, y)
+  if wndH == wndC then
+    MainForm.tooltipControls:hide()
+  end  
+end
+
+
+
+
+
 
 
 

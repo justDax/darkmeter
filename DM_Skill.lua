@@ -8,6 +8,7 @@ function Skill:new()
   -- TODO how do I manage critical multihits?
   -- possible soltion: add a table called multicrit to damage and heals and add there critical multihits
   local initialValues = {
+    name = "",
     damage = {
       deflects = 0,
       total = 0,
@@ -35,6 +36,15 @@ end
 
 -- adds new input to the current skill
 function Skill:add(formattedSkill)
+  -- set skill name
+  if self.name == "" and formattedSkill.name then
+    self.name = formattedSkill.name
+    -- I need to identify somehow if the skill belongs to a normal unit or a pet
+    -- I do this by setting the ownerName, if is not nil, this skill has been casted by a pet
+    self.casterName = formattedSkill.casterName
+    self.ownerName = formattedSkill.ownerName
+  end
+
   -- damage skill
   if formattedSkill.typology == 8 then
     self:ProcessDamage(formattedSkill)
@@ -101,6 +111,27 @@ end
 function Skill:ProcessFallingDamage(skill)
   self.damageDone = self.damageDone + skill.damage
 end
+
+
+------------------------------------------
+--   stats processing functon
+------------------------------------------
+-- this function is just an helper to dynamically get the needed stat amount
+
+function Skill:dataFor(stat)
+  if stat == "damageDone" then
+    return self.damageDone
+  elseif stat == "healingDone" then
+    return self.healingDone
+  elseif stat == "overhealDone" then
+    return self.overhealDone
+  elseif stat == "interrupts" then
+    return self.interrupts
+  else
+    Apollo.AddAddonErrorText(DarkMeter, "Skill class cannot pull data for stat: " .. stat)
+  end
+end
+
 
 
 

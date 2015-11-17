@@ -94,6 +94,7 @@ function Row:new(parent, i)
   row.bar:SetAnchorOffsets( 1, top, -1, (top + row.bar:GetHeight() ) )
   row.index = i
 
+
   self.__index = self
   return setmetatable(row, self)
 end
@@ -162,7 +163,7 @@ function Row:update(options)
     self.bar:FindChild("Data"):Show(false)
   end
 
-  -- width is in percentage
+  -- width
   if options.width then
     local bg = self.bar:FindChild("Background")
     local newLocation = bg:GetLocation():ToTable()
@@ -170,6 +171,14 @@ function Row:update(options)
     bg:MoveToLocation(WindowLocation.new( newLocation ) )
   end
 
+
+  -- sets unit reference
+  if options.unit and options.stat then
+    self.bar:SetData({
+      unit = options.unit,
+      stat = options.stat
+    })
+  end
 end
 
 
