@@ -302,7 +302,6 @@ function MainForm:showGroupStats()
     -- sort all group members by the main stat being monitored
     local orderedUnits = UI.lastFight:orderMembersBy(stats[1])
     -- local maxVal = orderedUnits[1][stats[1]](orderedUnits[1]) -- the first (highest) value of the stats passes, used to calculate bar width for others party members
-    -- SendVarToRover("orderedUnits", orderedUnits)
     
     for index = 1, #stats do
       -- calculate max stat among group members
@@ -320,7 +319,6 @@ function MainForm:showGroupStats()
           MainForm:initColumns() --  a new row has been added and I need to recalculate col heights
         end
         local options = MainForm:formatRowOptions(orderedUnits[i], UI.lastFight, index, maxVal, i)
-        SendVarToRover("options", options)
         MainForm.cols[index].rows[i]:update(options)
       end
 

@@ -215,7 +215,6 @@ end
 
 -- shows the desired data for the given fights
 function UI:showDataForFight(fight)
-  -- SendVarToRover("tempFight", fight)
   UI.lastFight = fight
   
   -- limit updates, updating the ui on every combatlog event kills fps

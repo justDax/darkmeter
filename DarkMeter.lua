@@ -149,9 +149,7 @@ end
 
 function DarkMeter:OnRestore(eType, data)
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
-	SendVarToRover("restored", data)
 	for k, v in pairs(data) do
-		-- TODO uncomment load settings
 		self.settings[k] = v
 	end
 
@@ -187,7 +185,6 @@ function DarkMeter:addTracked(name, index)
 	table.insert(self.settings.selectedStats, index, name)
 	UI.MainForm:initColumns()
 	self:updateUI()
-	SendVarToRover("settings", self.settings)
 end
 
 function DarkMeter:removeTracked(name)
@@ -200,7 +197,6 @@ function DarkMeter:removeTracked(name)
 			break
 		end
 	end
-	SendVarToRover("settings", self.settings)
 end
 
 
