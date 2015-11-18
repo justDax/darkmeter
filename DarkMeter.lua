@@ -5,7 +5,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.3.0"
+DarkMeter.version = "0.3.1"
 
 
 
@@ -70,7 +70,8 @@ local combatLogEvents = {
 	"CombatLogFallingDamage",
 	"CombatLogReflect",
 	"CombatLogMultiHitShields",
-	"CombatLogDamageShields"
+	"CombatLogDamageShields",
+	"CombatLogLifeSteal"
 }
 
 -----------------------------------------------------------------------------------------------
@@ -646,11 +647,15 @@ function DarkMeter:OnCombatLogCCState(e)
 end
 
 -- This event fires whenever an attack gets a Multi-Hit proc, but is completely absorbed by shields
+-- TODO check this event if gets processed normally, as there's no documentation on Houston
 function DarkMeter:OnCombatLogMultiHitShields(e)
 	if _G.DarkMeter.Development then
 		Print("Multihit! Absorbed!")
 	end
-	local skill = CombatUtils:formatCombatAction(e)
+	local skill = CombatUtils:formatCombatAction(e, {
+		multihit = true,
+		typology = 8  -- force all multihits with the same code as a damaging spell
+	})
 	CombatUtils:processFormattedSkill(skill)
 end
 
@@ -669,10 +674,13 @@ function DarkMeter:OnCombatLogFallingDamage(e)
 end
 
 -- This event fires whenever an attack is completely absorbed by shields.
+-- TODO check this event if gets processed normally, as there's no documentation on Houston
 function DarkMeter:OnCombatLogDamageShields(e)
 	if _G.DarkMeter.Development then
 		Print("DAMEIG! Absorbed!")
 	end
+	local skill = CombatUtils:formatCombatAction(e)
+	CombatUtils:processFormattedSkill(skill)
 end
 
 -- This event fires whenever a spell is reflected back on its caster.
@@ -680,6 +688,17 @@ function DarkMeter:OnCombatLogReflect(e)
 	if _G.DarkMeter.Development then
 		Print("REFLECT!!!!")
 	end
+	-- TODO process reflects
+end
+
+
+function DarkMeter:OnCombatLogLifeSteal(e)
+	if _G.DarkMeter.Development then
+		Print("LIFESTEAL!!!")
+	end
+	-- TODO I don't know if implement this or not, because this event only returns a flat number
+	-- representing the health stolen and the unit caster
+	-- no overheal, no skill used...
 end
 
 
