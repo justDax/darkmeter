@@ -5,7 +5,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.2.2"
+DarkMeter.version = "0.3.0"
 
 
 
@@ -571,7 +571,8 @@ function DarkMeter:OnCombatLogMultiHeal(e)
 		Print("MultiHeal!")
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
-		multihit = true
+		multihit = true,
+		typology = 10
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -586,11 +587,49 @@ function DarkMeter:OnCombatLogDeflect(e)
 	CombatUtils:processFormattedSkill(skill)
 end
 
+-- handles transference (skills that deals damage AND heals the user such as stalker's nano field)
 function DarkMeter:OnCombatLogTransference(e)
 	if _G.DarkMeter.Development then
 		Print("Log Transference")
 	end
-	-- TODO!
+
+	-- TODO! need to test this part better
+	local skill = CombatUtils:formatCombatAction(e, {
+		typology = 8
+	})
+	CombatUtils:processFormattedSkill(skill)
+
+	if e.tHealData then
+		for i = 1, #e.tHealData do
+			-- create a new spell and process it separately to consider the healing effect
+			-- this spell has most of its values taken from its damaging portion
+			local healEffect = CombatUtils:formatCombatAction(e.tHealData[i], {
+				state = e.eCombatResult,
+				owner = e.unitCasterOwner,
+				caster = skill.caster,
+				casterId = skill.casterId,
+				casterName = skill.casterName,
+				target = e.tHealData[i].unitHealed,
+			 	targetId = e.tHealData[i].unitHealed:GetId(),
+			 	targetName = e.tHealData[i].unitHealed:GetName(),
+			 	spell = skill.splCallingSpell,
+				name = skill.name,
+				ownerId = skill.ownerIdm,
+				ownerName = skill.onwerName,
+				multihit = skill.multihit,
+				typology = 10,
+				
+				-- TODO keep track of this part, I think it might get changed in the future
+				-- manually calculate heal and overheal beause the api is kinda illogical here
+				-- while on the CombatLogHeal event the heal returned is the real value with overheals subtracted
+				-- for this event (for no reason at all) I need to manually subtract the overhealing portion from the heal
+				overheal = e.tHealData[i].nOverheal,
+				heal = e.tHealData[i].nHealAmount - e.tHealData[i].nOverheal
+			})
+			CombatUtils:processFormattedSkill(healEffect)
+		end
+	end
+
 end
 
 function DarkMeter:OnCombatLogCCState(e)
