@@ -11,6 +11,7 @@ local Unit = {}
 -- external classes
 local Skill = Apollo.GetPackage("DarkMeter:Skill").tPackage
 local DarkMeter
+local DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
 
 -- wsUnit is a wildstar Unit, check the api for more infos on the Unit API Type
 function Unit:new(wsUnit)
@@ -19,15 +20,18 @@ function Unit:new(wsUnit)
   local unit = {}
   unit.wsUnit = wsUnit -- keep reference to wildstar api Unit
   unit.id = wsUnit:GetId()
+  unit.level = wsUnit:GetLevel()
   unit.rank = wsUnit:GetRank()
   unit.classId = wsUnit:GetClassId()
   unit.name = wsUnit:GetName()
   unit.inCombat = wsUnit:IsInCombat()
   unit.skills = {}          -- all skill casted by that unit, key is the skill name, and the value is a Skill instance
-  unit.skillsTaken = {}     -- all skills casted from enemies to the unit (key is the enemy name)
+  unit.damagingSkillsTaken = {}     -- all skills casted from enemies to the unit (storead as: {enemyName = {skillname = Skill, skillname2 = skill2}})
   unit.deathCount = 0
+  unit.deathsRecap = {}                  -- array of tables, each table is like {timestamp = {GameLib.GetLocalTime()}, skills = array with the lasdt 10 skills taken}
   unit.totalFightTime = 0
   unit.pets = {}            -- table:  key = pet name, value = Unit instance
+  unit.lastTenDamagingSkillsTaken = {} -- array of skills stored as formattedSkill NOT as a skill instance! used for death recap
 
   -- if the unit has an owner is a pet
   if wsUnit:GetUnitOwner() then
@@ -88,10 +92,8 @@ end
 
 -- adds a skill to the caster unit
 function Unit:addSkill(skill)
-  -- special condition for falling damage
-  if skill.fallingDamage then
-    self:addSkillTaken(skill)
-  else
+  -- special condition, ignore falling damage, as it gets added also as skilltaken
+  if not skill.fallingDamage then
     if not self.skills[skill.name] then
       self.skills[skill.name] = Skill:new()
     end
@@ -102,17 +104,39 @@ end
 
 -- adds a skill taken from an enemy
 function Unit:addSkillTaken(skill)
-  local name = skill.caster:GetName()
-  if not self.skillsTaken[name] then
-    self.skillsTaken[name] = {}
-  end
-  if not self.skillsTaken[name][skill.name] then
-    self.skillsTaken[name][skill.name] = Skill:new()
-  end
-  self.skillsTaken[name][skill.name]:add(skill)
+  -- process damage taken
+  if skill.typology == "damage" then
+    local name = skill.fallingDamage and "Gravity" or skill.casterName
+    
+    if not self.damagingSkillsTaken[name] then
+      self.damagingSkillsTaken[name] = {}
+    end
+    if not self.damagingSkillsTaken[name][skill.name] then
+      self.damagingSkillsTaken[name][skill.name] = Skill:new()
+    end
+    self.damagingSkillsTaken[name][skill.name]:add(skill)
+    
+    -- add to the last 10 damage taken
+    table.insert(self.lastTenDamagingSkillsTaken, 1, skill)
+    self.lastTenDamagingSkillsTaken[11] = nil
+    
+    -- if this unit is killed while taking this damage
+    if skill.targetkilled == true then
+      -- increment death counter
+      self.deathCount = self.deathCount + 1
+      -- create death recap with timestamp and last 10 damaging skills taken
+      local deathRecap = {
+        timestamp = GameLib.GetLocalTime(),
+        killerName = skill.casterName
+      }
+      deathRecap.skills = DMUtils.cloneTable(self.lastTenDamagingSkillsTaken)
+      table.insert(self.deathsRecap, 1, deathRecap)
+      self.lastTenDamagingSkillsTaken = {}
+    end
 
-  if skill.targetkilled then
-    self.deathCount = self.deathCount + 1
+  elseif skill.typology == "healing" then
+    -- TODO process healing taken
+    -- this might be a future trackable stat, I don't think is very useful for now
   end
 end
 
@@ -127,7 +151,7 @@ end
 -- returns damage taken
 function Unit:damageTaken()
   local total = 0
-  for enemy, skills in pairs(self.skillsTaken) do
+  for enemy, skills in pairs(self.damagingSkillsTaken) do
     for skillName, skill in pairs(skills) do
       total = total + skill.damageDone
     end
@@ -207,6 +231,94 @@ for i = 1, #stats do
     end
     return tmp
   end
+end
+
+
+-- returns all the skills taken as an array of skills
+function Unit:damageTakenSkills()
+  local tmp = {}
+  local function sortFunct(a, b)
+    return a.damageDone > b.damageDone
+  end
+
+   for enemy, skills in pairs(self.damagingSkillsTaken) do
+    for skillName, skill in pairs(skills) do
+      if skill.damageDone > 0 then
+        table.insert(tmp, skill)
+      end  
+    end
+  end
+  
+  if #tmp > 1 then
+    table.sort(tmp, sortFunct)
+  end
+  return tmp
+end
+
+-- returns a table {{name = strEnemyName, damage = nDamageDone}, ...}
+function Unit:damageTakenOrderedByEnemies()
+  local tmp = {}
+  local function sortFunct(a, b)
+    return a.damage > b.damage
+  end
+
+  for enemy, skills in pairs(self.damagingSkillsTaken) do
+    local skilltotal = 0
+    for skillName, skill in pairs(skills) do
+      skilltotal = skilltotal + skill.damageDone
+    end
+    table.insert(tmp, {name = enemy, damage = skilltotal})
+  end
+  
+
+  if #tmp > 1 then
+    table.sort(tmp, sortFunct)
+  end
+  return tmp
+end
+
+
+-- returns integer percentage of crit, multihit, deflects...
+function Unit:statsPercentages(bDamage)
+  local total = 0 -- total will hold the total number of skills thrown, crical and not + multihits + multicrits + deflects
+  local multi = 0
+  local multicrit = 0
+  local crit = 0
+  local deflects = 0
+
+  local key = bDamage and "damage" or "heals"
+  for skName, skill in pairs(self.skills) do
+    total = total + skill[key].total
+    multi = multi + #skill[key].multihits
+    multicrit = multicrit + #skill[key].multicrits
+    crit = crit + #skill[key].crits
+
+    if bDamage then
+      deflects = deflects + skill.damage.deflects
+    end
+  end
+
+  local percentages = {}
+  if multi + multicrit > 0 then
+    percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
+  else
+    percentages.multihits = 0
+  end
+  if multicrit > 0 then
+    percentages.multicrits = multicrit / (multi + multicrit) * 100
+  else
+    percentages.multicrits = 0
+  end
+  if crit + multicrit > 0 then
+    percentages.crits = (crit + multicrit) / total * 100
+  else
+    percentages.crits = 0
+  end
+  if bDamage then
+    percentages.deflects = deflects / total * 100
+  end
+  percentages.attacks = total
+  return percentages
 end
 
 

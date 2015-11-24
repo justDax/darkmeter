@@ -18,7 +18,7 @@ UI.lastFight = nil           -- contains reference to the last merged fight
 local ReportForm = Apollo.GetPackage("DarkMeter:ReportForm").tPackage           -- form used to report the addon data into ingame chat
 local SelectFight = Apollo.GetPackage("DarkMeter:SelectFight").tPackage           -- form to select which fight inspect
 local SettingsForm = Apollo.GetPackage("DarkMeter:SettingsForm").tPackage
-
+local PlayerDetails = Apollo.GetPackage("DarkMeter:PlayerDetails").tPackage
 
 function UI:init()
   DarkMeter = Apollo.GetAddon("DarkMeter")
@@ -57,6 +57,7 @@ function UI:OnDocLoaded()
     ReportForm:init(self.xmlDoc)
     SelectFight:init(self.xmlDoc)
     SettingsForm:init(self.xmlDoc)
+    PlayerDetails:init(self.xmlDoc)
 
     -- TODO the window popping on the lens is nice but I have two problems to deal with:
     -- clicking on the selectfight form allow the user to drag the addon
@@ -70,6 +71,7 @@ function UI:OnDocLoaded()
     if MainForm.initialLocation then -- location loaded from saved settings
       MainForm.form:MoveToLocation(WindowLocation.new(MainForm.initialLocation))
       MainForm:initColumns()
+      MainForm.wrapper:RecalculateContentExtents()
     end
   end
 end
@@ -230,6 +232,7 @@ UI.ResetForm = ResetForm
 UI.ReportForm = ReportForm
 UI.SelectFight = SelectFight
 UI.SettingsForm = SettingsForm
+UI.PlayerDetails = PlayerDetails
 UI.Row = Row
 
 

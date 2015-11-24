@@ -1,5 +1,6 @@
-<?xml version="0.3.1" encoding="UTF-8"?>
+<?xml version="0.4.0" encoding="UTF-8"?>
 <Addon Author="dax" APIVersion="11" Name="DarkMeter" Description="Combat stats">
+    <Script Name="ui/DM_SkillsIcons.lua"/>
     <Script Name="DM_Utilities.lua"/>
     <Script Name="DM_Skill.lua"/>
     <Script Name="DM_Unit.lua"/>
@@ -9,6 +10,7 @@
     <Script Name="ui/DM_ReportForm.lua"/>
     <Script Name="ui/DM_SelectFightForm.lua"/>
     <Script Name="ui/DM_SettingsForm.lua"/>
+    <Script Name="ui/DM_PlayerDetailsForm.lua"/>
     <Script Name="ui/DM_MainForm.lua"/>
     <Script Name="ui/DM_UI.lua"/>
     <Script Name="DarkMeter.lua"/>

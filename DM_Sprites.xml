@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Sprites>
+    <Sprite Name="DownArrow" Cycle="1">
+        <Frame Texture="DarkMeter\sprites\arrow-down.tga" x0="0" x1="0" x2="0" x3="0" x4="0" x5="256" y0="0" y1="0" y2="0" y3="0" y4="0" y5="128" Stretchy="1" HotspotX="0" HotspotY="0" Duration="1.000" StartColor="white" EndColor="white"/>
+    </Sprite>
     <AutoButton Name="ClearBtn" Texture="DarkMeter\sprites\ClearBtn.tga" x0="0" x1="0" x2="0" x3="0" x4="128" x5="128" y0="0" y1="0" y2="0" y3="0" y4="128" y5="128" Stretchy="1" StateBits="7" Direction="Across"/>
     <AutoButton Name="InspectFight" Texture="DarkMeter\sprites\Inspect.tga" x0="0" x1="0" x2="0" x3="0" x4="128" x5="128" y0="0" y1="0" y2="0" y3="0" y4="128" y5="128" Stretchy="1" StateBits="7" Direction="Across"/>
     <AutoButton Name="SettingsBtn" Texture="DarkMeter\sprites\SettingsBtn.tga" x0="0" x1="0" x2="0" x3="0" x4="128" x5="128" y0="0" y1="0" y2="0" y3="0" y4="128" y5="128" Stretchy="1" StateBits="7" Direction="Across"/>
     <AutoButton Name="ShoutBtn" Texture="DarkMeter\sprites\ShoutBtn.tga" x0="0" x1="0" x2="0" x3="0" x4="128" x5="128" y0="0" y1="0" y2="0" y3="0" y4="128" y5="128" Stretchy="1" StateBits="7" Direction="Across"/>
     <AutoButton Name="EyeBtn" Texture="DarkMeter\sprites\EyetBtn.tga" x0="0" x1="0" x2="0" x3="0" x4="128" x5="128" y0="0" y1="0" y2="0" y3="0" y4="128" y5="128" Stretchy="1" StateBits="7" Direction="Across"/>
-    <Sprite Name="DownArrow" Cycle="1">
-        <Frame Texture="DarkMeter\sprites\arrow-down.tga" x0="0" x1="0" x2="0" x3="0" x4="0" x5="256" y0="0" y1="0" y2="0" y3="0" y4="0" y5="128" Stretchy="1" HotspotX="0" HotspotY="0" Duration="1.000" StartColor="white" EndColor="white"/>
+    <Sprite Name="LeftArrow" Cycle="1">
+        <Frame Texture="DarkMeter\sprites\arrow-left.tga" x0="0" x1="0" x2="0" x3="0" x4="0" x5="128" y0="0" y1="0" y2="0" y3="0" y4="0" y5="256" Stretchy="1" HotspotX="0" HotspotY="0" Duration="1.000" StartColor="white" EndColor="white"/>
+    </Sprite>
+    <Sprite Name="RightArrow" Cycle="1">
+        <Frame Texture="DarkMeter\sprites\arrow-right.tga" x0="0" x1="0" x2="0" x3="0" x4="0" x5="128" y0="0" y1="0" y2="0" y3="0" y4="0" y5="256" Stretchy="1" HotspotX="0" HotspotY="0" Duration="1.000" StartColor="white" EndColor="white"/>
     </Sprite>
 </Sprites>

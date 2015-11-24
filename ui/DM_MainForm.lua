@@ -419,19 +419,38 @@ function MainForm.controls:OnRowMouseEnter(wndH, wndC, x, y)
     local lines = {}
 
     if unit[stat.."Skills"] ~= nil then
-      local skills = unit[stat.."Skills"](unit)
       lines.title = DMUtils:titleForStat(stat, false)
 
-      -- for the first 3 skills pull name, flat stat and contribution percentage to the overall value of the stat
-      for i = 1, 3 do
-        local skill = skills[i]
-        if skill then
-          local skillValue = skill:dataFor(stat)
-          local percentage = DMUtils.roundToNthDecimal( (skillValue / totalStat * 100), 1)
-          
-          lines[i] = percentage .. "%" .. " - " .. skill.name
-          if skill.ownerName then
-            lines[i] = lines[i] .. " (" .. skill.casterName .. ")"
+      -- differentiate damageTaken from the other stats
+      -- for damageTaken, list the enemies by their name and the % contribution to the toal dmg taken
+      -- for the others stat, list the skill's names
+      if stat == "damageTaken" then
+        local enemies = unit:damageTakenOrderedByEnemies()
+
+        for i = 1, 3 do
+          if enemies[i] then
+            local name = enemies[i].name
+            local dmg = enemies[i].damage
+            local percentage = DMUtils.roundToNthDecimal( (dmg / totalStat * 100), 1)
+            lines[i] = percentage .. "%" .. " - " .. name
+          end
+        end
+
+      -- now for the other stats ...
+      else
+        local skills = unit[stat.."Skills"](unit)
+
+        -- for the first 3 skills pull name, flat stat and contribution percentage to the overall value of the stat
+        for i = 1, 3 do
+          local skill = skills[i]
+          if skill then
+            local skillValue = skill:dataFor(stat)
+            local percentage = DMUtils.roundToNthDecimal( (skillValue / totalStat * 100), 1)
+            
+            lines[i] = percentage .. "%" .. " - " .. skill.name
+            if skill.ownerName then
+              lines[i] = lines[i] .. " (" .. skill.casterName .. ")"
+            end
           end
         end
       end
@@ -470,7 +489,19 @@ function MainForm.controls:OnRowMouseExit(wndH, wndC, x, y)
 end
 
 
+function MainForm.controls:OnRowPlayerDetails(wndH, wndC, mouseBtn, x, y)
+  if wndH == wndC then
+    local data = wndH:GetData()
+    if data ~= nil then
+      local unit = data.unit
 
+      if mouseBtn == 0 and unit ~= nil then
+        UI.PlayerDetails:setPlayer(unit)
+        UI.PlayerDetails:show()
+      end
+    end
+  end
+end
 
 
 

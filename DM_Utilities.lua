@@ -7,8 +7,11 @@ require "Window"
 
 local DMUtils = {}
 DMUtils.__index = DMUtils
+local Icons = Apollo.GetPackage("DarkMeter:Icons").tPackage
 
-
+if not Icons then
+  Apollo.AddAddonErrorText(DarkMeter, "Icons are not loaded")
+end
 
 ---------------------------
 -- classes variable setup
@@ -37,6 +40,17 @@ function DMUtils:iconForClass(unit)
     	return "IconSprites:Icon_SkillEsper_Geist"
     elseif unit.name == "Phantom" then -- esper phantom (wtf, no icon available for this skill on houston...)
     	return "IconSprites:Icon_Pets_Icon_PinkSquirgSquishling" -- return a pink squid pet icon...
+    end
+  end
+  return nil
+end
+
+
+
+function DMUtils:GetSpellIconByName(spellName)
+  for name, icon in pairs(Icons) do
+    if name == spellName then
+      return icon
     end
   end
   return nil
@@ -82,7 +96,7 @@ function DMUtils.formatNumber(num, places)
   elseif num >= 1000 then
       ret = placeValue:format(num / 1000) .. "k" -- thousand
   else
-      ret = num -- hundreds
+      ret = DMUtils.roundToNthDecimal(num, (places or 0)) -- hundreds
   end
   return ret
 end
@@ -143,4 +157,4 @@ end
 
 
 
-Apollo.RegisterPackage(DMUtils, "DarkMeter:Utils", 1, {})
+Apollo.RegisterPackage(DMUtils, "DarkMeter:Utils", 1, {"DarkMeter:Icons"})

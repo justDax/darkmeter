@@ -2,16 +2,19 @@
 -- DarkMeter
 -----------------------------------------------------------------------------------------------
  
+-- This addons use a custom class called Unit, which is a "wrapper" of the Unit class coming from the API
+-- variables called "unit" are usually instances of the cusom Unit class, while the Unit coming from the API is usually called "wsUnit" (wildstar unit)
+
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.3.1"
+DarkMeter.version = "0.4.0"
 
 
 
 if _G.DarkMeter == nil then _G.DarkMeter = {} end
 -- enable prints and rover debugging
-_G.DarkMeter.Development = false
+_G.DarkMeter.Development = true
 
 -----------------------------------------------------------------------------------------------
 -- Class Variables
@@ -166,6 +169,8 @@ function DarkMeter:OnRestore(eType, data)
 		-- if mainform window has been initialized, set its position, else set var and let the ui initialize the form position
 		if UI.MainForm.form ~= nil then
 			UI.MainForm.form:MoveToLocation(WindowLocation:new(MainForm.initialLocation))
+			UI.MainForm:initColumns()
+			UI.MainForm.wrapper:RecalculateContentExtents()
 		else
 			UI.MainForm.initialLocation = data.mainFormLocation
 		end
@@ -366,6 +371,7 @@ end
 ----------------------------------
 
 CombatUtils.Events = {}
+CombatUtils.formattedSkills = {}
 
 -- debug function only, not necessary
 function CombatUtils:updateCurrentFight()
@@ -394,7 +400,7 @@ function CombatUtils:formatCombatAction(e, customValues)
 		state = e.eCombatResult,
 		multihit = false,
 		damage = (e.nDamageAmount or 0) + (e.nAbsorption or 0) + (e.nShield or 0),
-		typology = e.eEffectType,
+		typology = "undefined",
 		heal = (e.nHealAmount or 0),
 		overheal = (e.nOverheal or 0),
 		owner = e.unitCasterOwner,
@@ -431,7 +437,10 @@ function CombatUtils:formatCombatAction(e, customValues)
 	setmetatable(customValues, event)
 	
 	if _G.DarkMeter.Development then
+		table.insert(CombatUtils.formattedSkills, 1, customValues)
+		CombatUtils.formattedSkills[11] = nil
 		SendVarToRover("formattedSkill", customValues)
+		SendVarToRover("10formattedSkills", CombatUtils.formattedSkills)
 	end
 	return customValues
 end
@@ -485,7 +494,9 @@ end
 
 -- process formatted skill action
 function CombatUtils:processFormattedSkill(skill)
-	if Group:inCombat() then
+	-- TODO skill.targetKilled will probably add the skill and unit only to the overall fight
+	-- as the currentFight should already be archived
+	if Group:inCombat() or skill.targetkilled then			-- usually the combat ends before the last damage gets processed
 		CombatUtils:addUnitsToFight(skill)								-- adds this unit to the currentFight if not already added
 		CombatUtils:addSkillToUnit(skill)									-- adds the casted skill to the caster
 		CombatUtils:updateCurrentFight()
@@ -543,7 +554,9 @@ function DarkMeter:OnCombatLogDamage(e)
 	if _G.DarkMeter.Development then
 		Print("DAMEIG!")
 	end
-	local skill = CombatUtils:formatCombatAction(e)
+	local skill = CombatUtils:formatCombatAction(e, {
+		typology = "damage"
+	})
 	CombatUtils:processFormattedSkill(skill)
 end
 
@@ -554,7 +567,7 @@ function DarkMeter:OnCombatLogMultiHit(e)
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
 		multihit = true,
-		typology = 8  -- force all multihits with the same code as a damaging spell
+		typology = "damage"
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -563,7 +576,9 @@ function DarkMeter:OnCombatLogHeal(e)
 	if _G.DarkMeter.Development then 
 		Print("Heal") 
 	end
-	local skill = CombatUtils:formatCombatAction(e)
+	local skill = CombatUtils:formatCombatAction(e, {
+		typology = "healing"
+	})
 	CombatUtils:processFormattedSkill(skill)
 end
 
@@ -573,7 +588,7 @@ function DarkMeter:OnCombatLogMultiHeal(e)
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
 		multihit = true,
-		typology = 10
+		typology = "healing"
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -583,7 +598,7 @@ function DarkMeter:OnCombatLogDeflect(e)
 		Print("deflect...")
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
-		typology = 8  -- force all deflects with the same code as a damaging spell
+		typology = "damage"
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -596,7 +611,7 @@ function DarkMeter:OnCombatLogTransference(e)
 
 	-- TODO! need to test this part better
 	local skill = CombatUtils:formatCombatAction(e, {
-		typology = 8
+		typology = "damage"
 	})
 	CombatUtils:processFormattedSkill(skill)
 
@@ -618,7 +633,7 @@ function DarkMeter:OnCombatLogTransference(e)
 				ownerId = skill.ownerIdm,
 				ownerName = skill.onwerName,
 				multihit = skill.multihit,
-				typology = 10,
+				typology = "healing",
 				
 				-- TODO keep track of this part, I think it might get changed in the future
 				-- manually calculate heal and overheal beause the api is kinda illogical here
@@ -642,6 +657,7 @@ function DarkMeter:OnCombatLogCCState(e)
 	})
 
 	if not e.bRemoved and e.nInterruptArmorHit > 0 then
+		skill.typology = "ccEffect"
 		CombatUtils:processFormattedSkill(skill)
 	end
 end
@@ -654,7 +670,7 @@ function DarkMeter:OnCombatLogMultiHitShields(e)
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
 		multihit = true,
-		typology = 8  -- force all multihits with the same code as a damaging spell
+		typology = "damage"  -- force all multihits with the same code as a damaging spell
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -668,7 +684,8 @@ function DarkMeter:OnCombatLogFallingDamage(e)
 		target = e.unitCaster,
 		targetId = e.unitCaster:GetId(),
 		fallingDamage = true,
-		name = "Falling damage"
+		name = "Falling damage",
+		typology = "damage"
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -679,7 +696,9 @@ function DarkMeter:OnCombatLogDamageShields(e)
 	if _G.DarkMeter.Development then
 		Print("DAMEIG! Absorbed!")
 	end
-	local skill = CombatUtils:formatCombatAction(e)
+	local skill = CombatUtils:formatCombatAction(e, {
+		typology = "damage"
+	})
 	CombatUtils:processFormattedSkill(skill)
 end
 
@@ -708,6 +727,9 @@ end
 -----------------------------------------------------------------------------------------------
 
 function DarkMeter:updateUI()
+	
+	-- updates MainForm
+
 	if self.settings.overall then
 		-- show overall data
 		if overallFight then
@@ -724,6 +746,14 @@ function DarkMeter:updateUI()
 		-- show specific fight
 		else
 			UI:showDataForFight(self.specificFight)
+		end
+	end
+
+	-- updates PlayerDetails if opened
+	if UI.PlayerDetails.visible then
+		local id = UI.PlayerDetails.unit.id
+		if UI.lastFight.groupMembers[id] then
+			UI.PlayerDetails:setPlayer(UI.lastFight.groupMembers[id])
 		end
 	end
 end
