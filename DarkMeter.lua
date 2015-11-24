@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.4.0"
+DarkMeter.version = "0.4.1"
 
 
 

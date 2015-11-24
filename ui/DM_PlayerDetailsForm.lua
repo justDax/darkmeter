@@ -228,7 +228,7 @@ end
 ---------------------------------------
 -- overall infos
 ---------------------------------------
-function PlayerDetails.controls.setOverallInfos(options)
+function PlayerDetails.controls.setOverallInfos(options, formatted)
   local iteration = {
     oCrit = "crit",
     oDeflect = "deflect",
@@ -250,7 +250,11 @@ function PlayerDetails.controls.setOverallInfos(options)
   -- others percentages
   for wndName, val in pairs(iteration) do
     if options[val] then
-      PlayerDetails[wndName]:SetText( DMUtils.roundToNthDecimal(options[val], 1) .. "%" )
+      if formatted == true then
+        PlayerDetails[wndName]:SetText(options[val])
+      else
+        PlayerDetails[wndName]:SetText( DMUtils.roundToNthDecimal(options[val], 1) .. "%" )
+      end
     else
       PlayerDetails[wndName]:SetText("-")
     end
@@ -525,6 +529,7 @@ function PlayerDetails.botControls:InspectSingleSkill(wndH, wndC, eBtn, nX, nY)
         if PlayerDetails.currentBotWindow == "first" then
           PlayerDetails.botControls:goToWindow("third")
           -- form damagetaken skill should be the name of the enemy
+          PlayerDetails.botControls:showOverallDoneBy(data)
           PlayerDetails.botControls:showDamgeDoneBy(data)
         -- if I'm on the third window go to skill details
         elseif PlayerDetails.currentBotWindow == "third" then
@@ -633,23 +638,75 @@ end
 
 
 
+-- shows overall damage done by the enemy units with this name
+function PlayerDetails.botControls:showOverallDoneBy(name)
+  local skillsTaken = PlayerDetails.unit.damagingSkillsTaken[name]
+  if skillsTaken then
+    local total = 0
+    local multi = 0
+    local multicrit = 0
+    local crit = 0
+    local deflects = 0
+    local damage = 0
+
+    for skillName, skill in pairs(skillsTaken) do
+      total = total + skill.damage.total
+      multi = multi + #skill.damage.multihits
+      multicrit = multicrit + #skill.damage.multicrits
+      crit = crit + #skill.damage.crits
+      deflects = deflects + skill.damage.deflects
+      damage = damage + skill.damageDone
+    end
+  
+    local percentages = {}
+    if multi + multicrit > 0 then
+      percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
+    else
+      percentages.multihits = 0
+    end
+    if multicrit > 0 then
+      percentages.multicrits = multicrit / (multi + multicrit) * 100
+    else
+      percentages.multicrits = 0
+    end
+    if crit + multicrit > 0 then
+      percentages.crits = (crit + multicrit) / total * 100
+    else
+      percentages.crits = 0
+    end
+
+    percentages.deflects = deflects / total * 100
+    percentages.attacks = total
+
+    local overallInfos = {
+      total = damage
+    }
+  
+    if percents then
+      overallInfos.crit = crits
+      overallInfos.multihit = multihits
+      overallInfos.multicrit = multicrits
+      overallInfos.attacks = attacks
+      overallInfos.deflect = deflects
+    end
+    PlayerDetails.controls.setOverallInfos(overallInfos)
+  end
+end
+
+
+
 function PlayerDetails.botControls:setBaseOverallInfos()
   local overallInfos = {
     total = PlayerDetails.unit[PlayerDetails.stat](PlayerDetails.unit)
   }
-  if PlayerDetails.stat == "damageDone" then
-    local percents = PlayerDetails.unit:statsPercentages(true)
+  
+  local percents = PlayerDetails.unit:statsPercentages(PlayerDetails.stat)
+  if percents then
     overallInfos.crit = percents.crits
+    overallInfos.multihit = percents.multihits
+    overallInfos.multicrit = percents.multicrits
+    overallInfos.attacks = percents.attacks
     overallInfos.deflect = percents.deflects
-    overallInfos.multihit = percents.multihits
-    overallInfos.multicrit = percents.multicrits
-    overallInfos.attacks = percents.attacks
-  elseif PlayerDetails.stat == "healingDone" then
-    local percents = PlayerDetails.unit:statsPercentages(false)
-    overallInfos.crit = percents.crits
-    overallInfos.multihit = percents.multihits
-    overallInfos.multicrit = percents.multicrits
-    overallInfos.attacks = percents.attacks
   end
   PlayerDetails.controls.setOverallInfos(overallInfos)
 end
@@ -662,29 +719,26 @@ function PlayerDetails.botControls:showDetailsForRow(data)
   local overallInfos = {
     total = data:dataFor(PlayerDetails.stat)
   }
-  if PlayerDetails.stat == "damageDone" then
-    local percents = data:statsPercentages(true)
-    overallInfos.crit = percents.crits
-    overallInfos.deflect = percents.deflects
-    overallInfos.multihit = percents.multihits
-    overallInfos.multicrit = percents.multicrits
-    overallInfos.attacks = percents.attacks
-  elseif PlayerDetails.stat == "healingDone" then
-    local percents = data:statsPercentages(false)
-    overallInfos.crit = percents.crits
-    overallInfos.multihit = percents.multihits
-    overallInfos.multicrit = percents.multicrits
-    overallInfos.attacks = percents.attacks
+  local percents = data:statsPercentages(PlayerDetails.stat)
+  if percents then
+    overallInfos.crit = percents.critsCount .. " - " .. DMUtils.roundToNthDecimal(percents.crits, 1) .. "%"
+    overallInfos.multihit = percents.multihitsCount .. " - " .. DMUtils.roundToNthDecimal(percents.multihits, 1) .. "%"
+    overallInfos.multicrit = percents.multicritsCount .. " - " .. DMUtils.roundToNthDecimal(percents.multicrits, 1) .. "%"
+    overallInfos.attacks = tostring(percents.attacks)
+    overallInfos.deflect = percents.deflectsCount .. " - " .. DMUtils.roundToNthDecimal(percents.deflects, 1) .. "%"
   end
-  PlayerDetails.controls.setOverallInfos(overallInfos)
+
+  PlayerDetails.controls.setOverallInfos(overallInfos, true)
 
   PlayerDetails.second:FindChild("Name"):SetText(data.name)
 
   local statType = nil
   if PlayerDetails.stat == "damageDone" or PlayerDetails.stat == "damageTaken" then
-    statType = "damage"
-  elseif PlayerDetails.stat == "healingDone" or PlayerDetails.stat == "overhealDone" then
-    statType = "heals"
+    statType = "damageDone"
+  elseif PlayerDetails.stat == "healingDone" then
+    statType = "healingDone"
+  elseif PlayerDetails.stat == "overhealDone" then
+    statType = "overhealDone"
   end
   -- sets table value
   local minCol = PlayerDetails.table:FindChild("MinCol")
@@ -692,26 +746,40 @@ function PlayerDetails.botControls:showDetailsForRow(data)
   local maxCol = PlayerDetails.table:FindChild("MaxCol")
   -- min col
   if statType then
-    for wndName, stat in pairs({Normal = "hits", Critical = "crits", Multihit = "multihits", Multicrit = "multicrits"}) do
-      local min = "-"
-      local max = "-"
-      local avg = "-"
-      if #data[statType][stat] > 0 then
-        min = DMUtils.formatNumber( math.min(unpack(data[statType][stat])), 2)
-        max = DMUtils.formatNumber( math.max(unpack(data[statType][stat])), 2)
-        avg = 0
-
-        for i = 1, #data[statType][stat] do
-          avg = avg + data[statType][stat][i]
+    for k, col in pairs({Min = minCol, Avg = avgCol, Max = maxCol}) do
+      local stat  = data[statType .. k](data)
+      for wndName, tp in pairs({Normal = "hits", Critical = "crits", Multihit = "multihits", Multicrit = "multicrits"}) do
+        local value = stat[tp]
+        if not value then
+          value = "-"
+        else
+          value = DMUtils.formatNumber( value, 2)
         end
-        avg = avg / #data[statType][stat]
-        avg = DMUtils.formatNumber( avg, 2)
-      end
-
-      minCol:FindChild(wndName):SetText( min )
-      avgCol:FindChild(wndName):SetText( avg )
-      maxCol:FindChild(wndName):SetText( max )
+        col:FindChild(wndName):SetText( value )
+      end      
     end
+
+    -- for wndName, stat in pairs({Normal = "hits", Critical = "crits", Multihit = "multihits", Multicrit = "multicrits"}) do
+    --   local min = "-"
+    --   local max = "-"
+    --   local avg = "-"
+    --   if #data[statType][stat] > 0 then
+
+    --     min = DMUtils.formatNumber( math.min(unpack(data[statType][stat])), 2)
+    --     max = DMUtils.formatNumber( math.max(unpack(data[statType][stat])), 2)
+    --     avg = 0
+
+    --     for i = 1, #data[statType][stat] do
+    --       avg = avg + data[statType][stat][i]
+    --     end
+    --     avg = avg / #data[statType][stat]
+    --     avg = DMUtils.formatNumber( avg, 2)
+    --   end
+
+    --   minCol:FindChild(wndName):SetText( min )
+    --   avgCol:FindChild(wndName):SetText( avg )
+    --   maxCol:FindChild(wndName):SetText( max )
+    -- end
   end
 
 end

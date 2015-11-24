@@ -19,7 +19,7 @@ function Skill:new()
     },
     heals = {
       total = 0,
-      hits = {},
+      hits = {},                      -- stored as: {heal = n, oHeal = n}
       crits = {},
       multihits = {},
       multicrits = {}
@@ -110,16 +110,16 @@ function Skill:ProcessHeal(skill)
   -- crit
   if skill.state == GameLib.CodeEnumCombatResult.Critical then
     if skill.multihit then
-      table.insert(self.heals.multicrits, skill.heal)
+      table.insert(self.heals.multicrits, {heal = skill.heal, oHeal = skill.overheal})
     else
-      table.insert(self.heals.crits, skill.heal)
+      table.insert(self.heals.crits, {heal = skill.heal, oHeal = skill.overheal})
     end
   -- normal hit
   elseif skill.state == GameLib.CodeEnumCombatResult.Hit then
     if skill.multihit then
-      table.insert(self.heals.multihits, skill.heal)
+      table.insert(self.heals.multihits, {heal = skill.heal, oHeal = skill.overheal})
     else
-      table.insert(self.heals.hits, skill.heal)
+      table.insert(self.heals.hits, {heal = skill.heal, oHeal = skill.overheal})
     end
   end
 
@@ -168,39 +168,152 @@ end
 
 
 -- returns integer percentage of multihit, crit, deflects...
-function Skill:statsPercentages(bDamage)
-  local key = bDamage and "damage" or "heals"
-  local total = self[key].total
-  local multi = #self[key].multihits
-  local multicrit = #self[key].multicrits
-  local crit = #self[key].crits
-  local deflects
-  if bDamage then
-    deflects = self.damage.deflects
+function Skill:statsPercentages(sStat)
+  Print("stat: " .. sStat)
+  local key
+  if sStat == "damageDone" or sStat == "damageTaken" then
+    key = "damage"
+  elseif sStat == "healingDone" or sStat == "overhealDone" or sStat == "rawhealDone" then
+    key = "heals"
   end
 
-  local percentages = {}
-  if multi + multicrit > 0 then
-    percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
-  else
-    percentages.multihits = 0
+  if key then
+    local total = self[key].total
+    local multi = #self[key].multihits
+    local multicrit = #self[key].multicrits
+    local crit = #self[key].crits
+
+    local percentages = {}
+    if multi + multicrit > 0 then
+      percentages.multihitsCount = multi + multicrit
+      percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
+    else
+      percentages.multihitsCount = 0
+      percentages.multihits = 0
+    end
+    if multicrit > 0 then
+      percentages.multicritsCount = multicrit
+      percentages.multicrits = multicrit / (multi + multicrit) * 100
+    else
+      percentages.multicritsCount = 0
+      percentages.multicrits = 0
+    end
+    if crit + multicrit > 0 then
+      percentages.critsCount = crit + multicrit
+      percentages.crits = (crit + multicrit) / total * 100
+    else
+      percentages.critsCount = 0
+      percentages.crits = 0
+    end
+    if key == "damage" and self.damage.deflects > 0 then
+      percentages.deflectsCount = self.damage.deflects
+      percentages.deflects = self.damage.deflects / total * 100
+    elseif key == "damage" then
+      percentages.deflectsCount = 0
+      percentages.deflects = 0
+    end
+    
+    percentages.attacks = total
+    return percentages
   end
-  if multicrit > 0 then
-    percentages.multicrits = multicrit / (multi + multicrit) * 100
-  else
-    percentages.multicrits = 0
-  end
-  if crit + multicrit > 0 then
-    percentages.crits = (crit + multicrit) / total * 100
-  else
-    percentages.crits = 0
-  end
-  if bDamage then
-    percentages.deflects = deflects / total * 100
-  end
+  return nil
+end
+
+
+-------------------------------------------------
+-- Min, Max and Avg functions for each stat
+-------------------------------------------------
+
+-- returns a table with avg hit, crit, multihit and multicrit
+for _, st in pairs({"damageDone", "healingDone", "overhealDone", "rawhealDone"}) do
   
-  percentages.attacks = total
-  return percentages
+  Skill[st .. "Avg"] = function (self)
+    local tmp = {}
+    local tble = st == "damageDone" and self.damage or self.heals
+    
+    for k, v in pairs(tble) do
+      if type(v) == "table" then
+        local i = 0
+        tmp[k] = 0
+        for _, amount in pairs(v) do
+          if st == "damageDone" then
+            tmp[k] = tmp[k] + amount
+          elseif st == "healingDone" then
+            tmp[k] = tmp[k] + amount.heal
+          elseif st == "overhealDone" then
+            tmp[k] = tmp[k] + amount.oHeal
+          elseif st == "rawhealDone" then
+            tmp[k] = tmp[k] + amount.heal + amount.oHeal
+          end
+
+          i = i + 1
+        end
+        if tmp[k] > 0 then
+          tmp[k] = tmp[k] / i
+        end
+      end
+    end
+    return tmp
+  end
+
+
+  Skill[st .. "Max"] = function(self)
+    local tmp = {}
+    local tble = st == "damageDone" and self.damage or self.heals
+
+    for k, v in pairs(tble) do
+      if type(v) == "table" then
+        local arr = {}
+
+        for _, amount in pairs(v) do
+          if st == "damageDone" then
+            table.insert(arr, amount) 
+          elseif st == "healingDone" then
+            table.insert(arr, amount.heal)
+          elseif st == "overhealDone" then
+            table.insert(arr, amount.oHeal)
+          elseif st == "rawhealDone" then
+            table.insert(arr, (amount.heal + amount.oHeal))
+          end
+        end
+        if #arr > 0 then
+          tmp[k] = math.max(unpack(arr))
+        end
+
+      end
+    end
+    return tmp
+  end
+
+
+  Skill[st .. "Min"] = function(self)
+    local tmp = {}
+    local tble = st == "damageDone" and self.damage or self.heals
+
+    for k, v in pairs(tble) do
+      if type(v) == "table" then
+        local arr = {}
+
+        for _, amount in pairs(v) do
+          if st == "damageDone" then
+            table.insert(arr, amount) 
+          elseif st == "healingDone" then
+            table.insert(arr, amount.heal)
+          elseif st == "overhealDone" then
+            table.insert(arr, amount.oHeal)
+          elseif st == "rawhealDone" then
+            table.insert(arr, (amount.heal + amount.oHeal))
+          end
+        end
+        if #arr > 0 then
+          tmp[k] = math.min(unpack(arr))
+        end
+
+      end
+    end
+    return tmp
+  end
+
 end
 
 

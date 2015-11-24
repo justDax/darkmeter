@@ -279,46 +279,73 @@ end
 
 
 -- returns integer percentage of crit, multihit, deflects...
-function Unit:statsPercentages(bDamage)
+function Unit:statsPercentages(sStat)
   local total = 0 -- total will hold the total number of skills thrown, crical and not + multihits + multicrits + deflects
   local multi = 0
   local multicrit = 0
   local crit = 0
   local deflects = 0
 
-  local key = bDamage and "damage" or "heals"
-  for skName, skill in pairs(self.skills) do
-    total = total + skill[key].total
-    multi = multi + #skill[key].multihits
-    multicrit = multicrit + #skill[key].multicrits
-    crit = crit + #skill[key].crits
+  local key
+  if sStat == "damageDone" then
+    key = "damage"
+  elseif sStat == "healingDone" or sStat == "overhealDone" or sStat == "rawhealDone" then
+    key = "heals"
+  elseif sStat == "damageTaken" then
+    key = "damagingSkillsTaken"
+  end
 
-    if bDamage then
-      deflects = deflects + skill.damage.deflects
+  if key then
+    if key == "damagingSkillsTaken" then
+      for enemy, skills in pairs(self.damagingSkillsTaken) do
+        for skName, skill in pairs(skills) do
+          total = total + skill.damage.total
+          multi = multi + #skill.damage.multihits
+          multicrit = multicrit + #skill.damage.multicrits
+          crit = crit + #skill.damage.crits
+
+          if key == "damage" then
+            deflects = deflects + skill.damage.deflects
+          end
+        end
+      end
+    else
+      for skName, skill in pairs(self.skills) do
+        total = total + skill[key].total
+        multi = multi + #skill[key].multihits
+        multicrit = multicrit + #skill[key].multicrits
+        crit = crit + #skill[key].crits
+
+        if key == "damage" then
+          deflects = deflects + skill.damage.deflects
+        end
+      end
     end
-  end
 
-  local percentages = {}
-  if multi + multicrit > 0 then
-    percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
-  else
-    percentages.multihits = 0
+    
+
+    local percentages = {}
+    if multi + multicrit > 0 then
+      percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
+    else
+      percentages.multihits = 0
+    end
+    if multicrit > 0 then
+      percentages.multicrits = multicrit / (multi + multicrit) * 100
+    else
+      percentages.multicrits = 0
+    end
+    if crit + multicrit > 0 then
+      percentages.crits = (crit + multicrit) / total * 100
+    else
+      percentages.crits = 0
+    end
+    if key == "damage" then
+      percentages.deflects = deflects / total * 100
+    end
+    percentages.attacks = total
+    return percentages
   end
-  if multicrit > 0 then
-    percentages.multicrits = multicrit / (multi + multicrit) * 100
-  else
-    percentages.multicrits = 0
-  end
-  if crit + multicrit > 0 then
-    percentages.crits = (crit + multicrit) / total * 100
-  else
-    percentages.crits = 0
-  end
-  if bDamage then
-    percentages.deflects = deflects / total * 100
-  end
-  percentages.attacks = total
-  return percentages
 end
 
 
