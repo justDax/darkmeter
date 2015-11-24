@@ -461,6 +461,9 @@ function PlayerDetails.botControls:updateBottomPart(unitSkills)
       if PlayerDetails.stat == "damageTaken" then
         skillValue = skill.damage
         dataToBind = skill.name -- in this case bind enemy name used to retrieve the enemy's skills later
+      elseif PlayerDetails.stat == "interrupts" then
+        skillValue = skill:dataFor(PlayerDetails.stat)
+        dataToBind = false
       else
         skillValue = skill:dataFor(PlayerDetails.stat)
         dataToBind = skill
@@ -500,7 +503,12 @@ function PlayerDetails.botControls:updateSingleSkill(row, percentage, name, skil
   row:FindChild("Percentage"):SetText(percentage)
   row:FindChild("Data"):SetText(value)
   row:FindChild("Name"):SetText(name)
-  row:SetData(data)
+  if data == false then
+    row:FindChild("Arrow"):Show(false)
+  else
+    row:FindChild("Arrow"):Show(true)
+    row:SetData(data)
+  end
 end
 
 
