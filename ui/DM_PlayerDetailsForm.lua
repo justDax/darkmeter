@@ -725,7 +725,9 @@ function PlayerDetails.botControls:showDetailsForRow(data)
     overallInfos.multihit = percents.multihitsCount .. " - " .. DMUtils.roundToNthDecimal(percents.multihits, 1) .. "%"
     overallInfos.multicrit = percents.multicritsCount .. " - " .. DMUtils.roundToNthDecimal(percents.multicrits, 1) .. "%"
     overallInfos.attacks = tostring(percents.attacks)
-    overallInfos.deflect = percents.deflectsCount .. " - " .. DMUtils.roundToNthDecimal(percents.deflects, 1) .. "%"
+    if percents.deflects and percents.deflectsCount then
+        overallInfos.deflect = percents.deflectsCount .. " - " .. DMUtils.roundToNthDecimal(percents.deflects, 1) .. "%"
+      end
   end
 
   PlayerDetails.controls.setOverallInfos(overallInfos, true)

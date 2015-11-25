@@ -14,7 +14,7 @@ DarkMeter.version = "0.4.1"
 
 if _G.DarkMeter == nil then _G.DarkMeter = {} end
 -- enable prints and rover debugging
-_G.DarkMeter.Development = true
+_G.DarkMeter.Development = false
 
 -----------------------------------------------------------------------------------------------
 -- Class Variables

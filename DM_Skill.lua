@@ -169,7 +169,6 @@ end
 
 -- returns integer percentage of multihit, crit, deflects...
 function Skill:statsPercentages(sStat)
-  Print("stat: " .. sStat)
   local key
   if sStat == "damageDone" or sStat == "damageTaken" then
     key = "damage"
