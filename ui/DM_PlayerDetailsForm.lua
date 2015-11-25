@@ -758,28 +758,6 @@ function PlayerDetails.botControls:showDetailsForRow(data)
         col:FindChild(wndName):SetText( value )
       end      
     end
-
-    -- for wndName, stat in pairs({Normal = "hits", Critical = "crits", Multihit = "multihits", Multicrit = "multicrits"}) do
-    --   local min = "-"
-    --   local max = "-"
-    --   local avg = "-"
-    --   if #data[statType][stat] > 0 then
-
-    --     min = DMUtils.formatNumber( math.min(unpack(data[statType][stat])), 2)
-    --     max = DMUtils.formatNumber( math.max(unpack(data[statType][stat])), 2)
-    --     avg = 0
-
-    --     for i = 1, #data[statType][stat] do
-    --       avg = avg + data[statType][stat][i]
-    --     end
-    --     avg = avg / #data[statType][stat]
-    --     avg = DMUtils.formatNumber( avg, 2)
-    --   end
-
-    --   minCol:FindChild(wndName):SetText( min )
-    --   avgCol:FindChild(wndName):SetText( avg )
-    --   maxCol:FindChild(wndName):SetText( max )
-    -- end
   end
 
 end
@@ -790,29 +768,27 @@ function PlayerDetails.botControls:deathRecapFor(data)
   -- local name = data.timestamp.nHour .. ":" .. data.timestamp.nMinute .. " (last 10 damage taken)"
   local name = "last 10 damage taken"
   PlayerDetails.fourth:FindChild("Name"):SetText(name)
-  PlayerDetails.fourth:DestroyAllPixies()
+
+  if PlayerDetails.botControls.deathRecapRows == nil then
+    PlayerDetails.botControls.deathRecapRows = {}
+  end
+  for i = 1, #PlayerDetails.botControls.deathRecapRows do
+    PlayerDetails.botControls.deathRecapRows[i]:destroy()
+    PlayerDetails.botControls.deathRecapRows[i] = nil
+  end
+
+
   local counter = 0
   for i = #data.skills, 1, -1 do
     counter = counter + 1
+    PlayerDetails.botControls.deathRecapRows[counter] = PlayerDetails.botControls:createSingleBar(counter, PlayerDetails.fourth, 30)
     local skill = data.skills[i]
-    local top = 10 + (20 * counter)
-    local text = counter .. ") " .. skill.damage .. " - " .. skill.name .. " (".. skill.casterName .. ")"
+    local text = skill.name .. " - " .. skill.damage
     if i == 1 then
-      text = counter .. ") " .. skill.damage .. "(R.I.P.) - " .. skill.name .. " (".. skill.casterName .. ")"
+      text = "[R.I.P.] " .. text
     end
 
-    local options = {
-      strText = text,
-      loc = {
-        fPoints = {0, 0, 1, 0},
-        nOffsets = {10, top, 0, (top + 20)}
-      },
-      flagsText = {
-        DT_VCENTER = true
-      },
-      strFont = "CRB_Interface9_B"
-    }
-    PlayerDetails.fourth:AddPixie(options)
+    PlayerDetails.botControls:updateSingleSkill(PlayerDetails.botControls.deathRecapRows[counter], counter .. ")", text, "", false)
   end
   -- TODO fourth wndow is not scrolling... even with a recalculate content extents, maybe the pixies gets ignored
   PlayerDetails.fourth:RecalculateContentExtents()
