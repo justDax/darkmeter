@@ -105,61 +105,6 @@ function Fight:paused()
 end
 
 
-
--- -- return damagedone by all members in this specific fight
--- function Fight:damageDone()
---   local totalDmg = 0
---   for id, unit in pairs(self.groupMembers) do
---     totalDmg = totalDmg + unit:damageDone()
---   end
---   return totalDmg
--- end
-
--- -- return healing done by all members in this specific fight
--- function Fight:healingDone()
---   local total = 0
---   for id, unit in pairs(self.groupMembers) do
---     total = total + unit:healingDone()
---   end
---   return total
--- end
-
--- -- return overhealing done by all members in this specific fight
--- function Fight:overhealDone()
---   local total = 0
---   for id, unit in pairs(self.groupMembers) do
---     total = total + unit:overhealDone()
---   end
---   return total
--- end
-
--- -- return interrupts done by all
--- function Fight:interrupts()
---   local total = 0
---   for id, unit in pairs(self.groupMembers) do
---     total = total + unit:interrupts()
---   end
---   return total
--- end
-
--- -- returns total damage taken
--- function Fight:damageTaken()
---   local total = 0
---   for id, unit in pairs(self.groupMembers) do
---     total = total + unit:damageTaken()
---   end
---   return total
--- end
-
--- -- returns total deaths
--- function Fight:deaths()
---   local total = 0
---   for id, unit in pairs(self.groupMembers) do
---     total = total + unit:deaths()
---   end
---   return total
--- end
-
 local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "damageTaken", "deaths"}
 
 for i = 1, #stats do

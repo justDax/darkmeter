@@ -144,7 +144,7 @@ function Row:update(options)
     local nameWindow = self.bar:FindChild("Name")
     nameWindow:Show(true)
     nameWindow:SetText(options.name)
-    nameWindow:SetAnchorOffsets( (55 - moveLeft), 0, -115, 0)
+    nameWindow:SetAnchorOffsets( (55 - moveLeft), 0, 0, 0)
   elseif options.name == false then
     self.bar:FindChild("Name"):Show(false)
   end

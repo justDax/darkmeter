@@ -14,5 +14,6 @@
     <Script Name="ui/DM_MainForm.lua"/>
     <Script Name="ui/DM_UI.lua"/>
     <Script Name="DarkMeter.lua"/>
+    <Script Name="DM_Test.lua"/>
     <Form Name="DarkMeter.xml"/>
 </Addon>

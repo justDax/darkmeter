@@ -107,7 +107,10 @@ end
 -- DarkMeter OnLoad
 -----------------------------------------------------------------------------------------------
 function DarkMeter:OnLoad()
-	Apollo.LoadSprites("DM_Sprites.xml", "DM_Sprites")
+	-- load form file
+	self.xmlDoc = XmlDoc.CreateFromFile("DarkMeter.xml")
+	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
+	
 
 	-- external classes
 	DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
@@ -147,6 +150,13 @@ function DarkMeter:OnLoad()
 
 	self:updateGroup()
 	UI:init()
+end
+
+-- after form has been loaded
+function DarkMeter:OnDocLoaded()
+	Apollo.LoadSprites("DM_Sprites.xml", "DM_Sprites")
+	-- the xml file reference is no longer needed
+	self.xmlDoc = nil
 end
 
 
@@ -536,6 +546,11 @@ function DarkMeter:stopCurrentFight()
 	currentFight = nil
 	-- after 0.6 sec call an updateUI to check if the interface needs an update
 	ApolloTimer.Create(0.6, false, "updateUI", DarkMeter)
+end
+
+-- used to add dummy testing data to the archived fights
+function DarkMeter:addFightToArchive(fight)
+	table.insert(fightsArchive, 1, DMUtils.cloneTable(fight))
 end
 
 
