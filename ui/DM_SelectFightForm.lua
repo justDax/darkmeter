@@ -58,6 +58,11 @@ function SelectFight:hide()
 end
 
 
+function SelectFight.controls:OnCancel()
+  SelectFight:hide()
+end
+
+
 function SelectFight.controls:enableButton(button)
   button:Enable(true)
   local bgHover = button:FindChild("Bg")
@@ -80,6 +85,7 @@ function SelectFight.controls:OnOverall()
   DarkMeter.specificFight = nil
   DarkMeter:updateUI()
   UI.MainForm:setTracked()
+  SelectFight:hide()
 end
 
 function SelectFight.controls:OnCurrent()
@@ -87,6 +93,7 @@ function SelectFight.controls:OnCurrent()
   DarkMeter.specificFight = nil
   DarkMeter:updateUI()
   UI.MainForm:setTracked()
+  SelectFight:hide()
 end
 
 -- btn functions from 1 to 5
@@ -96,6 +103,7 @@ for i = 1, 5 do
     DarkMeter.specificFight = DarkMeter:specificFightByIndex(i)
     DarkMeter:updateUI()
     UI.MainForm:setTracked()
+    SelectFight:hide()
   end
 end
 
