@@ -5,6 +5,11 @@ local icons = {
 
   ["Falling damage"] = "CRB_ActionBarFrameSprites:sprResourceBar_Sprint_RunIconRed",
 
+  -- fixes esper phantom's bite
+  ["Bite"] = "Icon_SkillShadow_UI_SM_undrwrlddrms",
+  -- fixes esper geist's Strike
+  Strike = "ClientSprites:Icon_SkillEsper_Geist",
+
   -- stalker
 
   ["Amplification Spike"] = "ClientSprites:Icon_SkillStalker_Amplifide_Spike",

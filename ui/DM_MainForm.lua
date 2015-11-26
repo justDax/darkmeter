@@ -129,7 +129,12 @@ function MainForm:initColumns()
   self.contentWidth = self.content:GetWidth()
   self.colWidth = {}
 
+  local rowHeight = DarkMeter.settings.rowHeight
   local stats = DarkMeter.settings.selectedStats
+  local rowsQt = 0 
+  if UI.lastFight then
+    rowsQt = #UI.lastFight:orderMembersBy(stats[1])
+  end
   if not stats then
     Apollo.AddAddonErrorText(DarkMeter, "Cannot initialize columns, invalid value for stats variable.")
   end
@@ -148,8 +153,9 @@ function MainForm:initColumns()
     local mainColWidth = (totalWidth - (#stats -1) * UI.minColWidth )
     local otherColsWidth = UI.minColWidth
     local colWidth = i == 1 and mainColWidth or otherColsWidth
+
     local left = i == 1 and 0 or (mainColWidth + (i - 2) * otherColsWidth )
-    local rowsHeight = self.cols[i].rows ~= nil and (21 * (#self.cols[i].rows + 1) ) or 0
+    local rowsHeight = ( (1 + rowHeight) * (rowsQt + 1) )
     local colHeight = math.max(MainForm.wrapper:GetHeight(), rowsHeight)
 
     if i == 1 then -- set container position only once
@@ -165,9 +171,11 @@ function MainForm:initColumns()
     -- save current col width
     self.colWidth[i] = self.cols[i].column:GetWidth()
     -- create column title
-    if self.cols[i].header == nil then
-      self.cols[i].header = UI.Row:new(self.cols[i].column, 1)
+    if self.cols[i].header then
+      self.cols[i].header.bar:Destroy()
+      self.cols[i].header = nil
     end
+    self.cols[i].header = UI.Row:new(self.cols[i].column, 1)
     
     -- update title with the correct infos
     MainForm.cols[i].header:update({
@@ -186,6 +194,8 @@ function MainForm:initColumns()
       self.cols[i] = nil
     end
   end
+
+  self.wrapper:RecalculateContentExtents()
 end
 
 
@@ -464,7 +474,7 @@ function MainForm.controls:OnRowMouseEnter(wndH, wndC, x, y)
         totalTop = totalTop + top
         win = win:GetParent()
       end
-      
+      -- TODO the top value doesn't count if the for is scrolled !
 
       MainForm.tooltipControls:setText(lines)
       MainForm.tooltipControls:show()

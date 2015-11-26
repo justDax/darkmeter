@@ -23,6 +23,8 @@ function SettingsForm:init(xmlDoc)
     SettingsForm.tracked = SettingsForm.form:FindChild("Tracked")
     SettingsForm.untracked = SettingsForm.form:FindChild("Untracked")
     SettingsForm.buttons = SettingsForm.form:FindChild("Buttons")
+    SettingsForm.rowHeightSlider = SettingsForm.buttons:FindChild("RowHeight"):FindChild("Slider"):FindChild("SliderBar")
+    SettingsForm.rowHeightBox = SettingsForm.buttons:FindChild("RowHeight"):FindChild("RowHeightBox")
 
     SettingsForm.form:Show(false)
   else
@@ -31,31 +33,63 @@ function SettingsForm:init(xmlDoc)
 end
 
 
+-- reinit mainform columns and rows
+function SettingsForm:reinitUI()
+  UI.MainForm:clear()
+  UI.MainForm:initColumns()
+  UI.MainForm:showGroupStats()
+end
+
+
+
 function SettingsForm.controls:OnMergePets()
   local btn = SettingsForm.buttons:FindChild("MergePets")
   DarkMeter.settings.mergePets = btn:IsChecked()
-  DarkMeter:updateUI()
+  SettingsForm:reinitUI()
 end
 
 function SettingsForm.controls:OnShowClassIcon()
   local btn = SettingsForm.buttons:FindChild("ShowClassIcon")
   DarkMeter.settings.showClassIcon = btn:IsChecked()
-  DarkMeter:updateUI()
+  SettingsForm:reinitUI()
 end
 
 function SettingsForm.controls:OnShowRanks()
   local btn = SettingsForm.buttons:FindChild("ShowRanks")
   DarkMeter.settings.showRanks = btn:IsChecked()
-  DarkMeter:updateUI()
+  SettingsForm:reinitUI()
 end
 
 function SettingsForm.controls:OnMapChangeReset(wndH, wndC, eBtn)
-  if (wndH == wndC) then
+  if wndH == wndC then
     -- value can be 1 (always), 2 (ask), 3 (never)
     local value = wndH:GetContentType()
-    Print("map reset: " .. value)
     DarkMeter.settings.resetMapChange = tonumber(value)
   end
+end
+
+
+function SettingsForm.controls:OnBarHeightChanged(wndH, wndC, fNewVal, fOldVal)
+  Print("CAMBIO!")
+  local val = math.floor(fNewVal)
+  SettingsForm.rowHeightBox:SetText(tostring(val))
+  DarkMeter.settings.rowHeight = val
+  SettingsForm:reinitUI()
+end
+
+
+function SettingsForm.controls:OnBarHeightBoxChanged(wndH, wndC, sVal)
+  local val = tonumber(sVal)
+  if val ~= nil then
+    if val < 20 then val = 20 end
+    if val > 50 then val = 50 end
+  else
+    val = DarkMeter.settings.rowHeight
+  end
+  SettingsForm.rowHeightBox:SetText(val)
+  DarkMeter.settings.rowHeight = val
+  SettingsForm.rowHeightSlider:SetValue(val)
+  SettingsForm:reinitUI()
 end
 
 
@@ -76,7 +110,7 @@ function SettingsForm:show()
     local top = (screenHeight - winHeight)/2
  
     self.form:Move( left, top, winWidth, winHeight )
-    self:setCheckBoxes()
+    self:setValuesFromSettings()
     self:createDraggableBoxes()
     self.form:Show(true)
   end
@@ -96,12 +130,14 @@ function SettingsForm.controls:OnCancel()
   SettingsForm:hide()
 end
 
--- sets initial checkboxes values
-function SettingsForm:setCheckBoxes()
+-- sets initial values based on the character's loaded settings
+function SettingsForm:setValuesFromSettings()
   self.buttons:FindChild("MergePets"):SetCheck(DarkMeter.settings.mergePets)
   self.buttons:FindChild("ShowRanks"):SetCheck(DarkMeter.settings.showRanks)
   self.buttons:FindChild("ShowClassIcon"):SetCheck(DarkMeter.settings.showClassIcon)
   self.buttons:FindChild("ResetFightBox"):FindChild("ResetFight" .. DarkMeter.settings.resetMapChange):SetCheck(true)
+  self.rowHeightSlider:SetValue(DarkMeter.settings.rowHeight)
+  self.rowHeightBox:SetText(DarkMeter.settings.rowHeight)
 end
 
 

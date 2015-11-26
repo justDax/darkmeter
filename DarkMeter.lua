@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.4.1"
+DarkMeter.version = "0.4.2"
 
 
 
@@ -56,7 +56,8 @@ DarkMeter.settings = {
 		"interrupts"
 	},
 	reportRows = 5,								-- number of rows reported in chat
-	resetMapChange = 2						-- integer value, can be: 1 (always), 2 (ask), 3 (never)
+	resetMapChange = 2,						-- integer value, can be: 1 (always), 2 (ask), 3 (never)
+	rowHeight = 26								-- mainform for height (from 20 to 50)
 }
 
 DarkMeter.specificFight = nil 					-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
@@ -739,9 +740,10 @@ end
 -----------------------------------------------------------------------------------------------
 
 function DarkMeter:updateUI()
+	-- this function gets called from other modules, I need to set needsupdate here also
+	UI.needsUpdate = true
 	
 	-- updates MainForm
-
 	if self.settings.overall then
 		-- show overall data
 		if overallFight then

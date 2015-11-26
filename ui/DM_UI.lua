@@ -70,9 +70,9 @@ function UI:OnDocLoaded()
     
     if MainForm.initialLocation then -- location loaded from saved settings
       MainForm.form:MoveToLocation(WindowLocation.new(MainForm.initialLocation))
-      MainForm:initColumns()
-      MainForm.wrapper:RecalculateContentExtents()
     end
+    MainForm:initColumns()
+    MainForm.wrapper:RecalculateContentExtents()
   end
 end
 
@@ -92,8 +92,9 @@ function Row:new(parent, i)
   if not row.bar then
     Apollo.AddAddonErrorText(DarkMeter, "Cannot load BarForm from the xml file.")
   end
-  local top = (1 * row.bar:GetHeight() ) * (i - 1) + 1;
-  row.bar:SetAnchorOffsets( 1, top, -1, (top + row.bar:GetHeight() ) )
+  local rowHeight = DarkMeter.settings.rowHeight
+  local top = (1 * rowHeight ) * (i - 1) + 1;
+  row.bar:SetAnchorOffsets( 1, top, -1, (top + rowHeight ) )
   row.index = i
 
 
@@ -131,7 +132,7 @@ function Row:update(options)
       local icon = self.bar:FindChild("Icon")
       icon:Show(true)
       icon:SetSprite(options.icon)
-      icon:SetAnchorOffsets( (30 - moveLeft), 0, (50 -  moveLeft), 20)
+      icon:SetAnchorOffsets( (30 - moveLeft), math.ceil((DarkMeter.settings.rowHeight - 20) / 2), (50 -  moveLeft), (math.ceil((DarkMeter.settings.rowHeight - 20) / 2) + 20))
     elseif options.icon == false then
       self.bar:FindChild("Icon"):Show(false)
     end
