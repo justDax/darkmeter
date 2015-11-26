@@ -201,9 +201,16 @@ function UI:hide()
   MainForm.form:Show(false)
 end
 
--- prompt reset data, used inside DarkMeter on worldchange
+-- ask the user to reset the data with a dialog
 function UI:promptResetData()
-  ResetForm:show()
+  -- 1 - always reset the data
+  if DarkMeter.settings.resetMapChange == 1 then
+    UI:resetData()
+  -- 2 - ask the user
+  elseif DarkMeter.settings.resetMapChange == 2 then
+    UI.ResetForm:show()
+  end
+  -- 3 - never reset data
 end
 
 -- if the user confirms to reset the data

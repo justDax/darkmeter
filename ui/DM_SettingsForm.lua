@@ -49,6 +49,15 @@ function SettingsForm.controls:OnShowRanks()
   DarkMeter:updateUI()
 end
 
+function SettingsForm.controls:OnMapChangeReset(wndH, wndC, eBtn)
+  if (wndH == wndC) then
+    -- value can be 1 (always), 2 (ask), 3 (never)
+    local value = wndH:GetContentType()
+    Print("map reset: " .. value)
+    DarkMeter.settings.resetMapChange = tonumber(value)
+  end
+end
+
 
 -------------------------------------------------------------
 -- Display functions
@@ -92,6 +101,7 @@ function SettingsForm:setCheckBoxes()
   self.buttons:FindChild("MergePets"):SetCheck(DarkMeter.settings.mergePets)
   self.buttons:FindChild("ShowRanks"):SetCheck(DarkMeter.settings.showRanks)
   self.buttons:FindChild("ShowClassIcon"):SetCheck(DarkMeter.settings.showClassIcon)
+  self.buttons:FindChild("ResetFightBox"):FindChild("ResetFight" .. DarkMeter.settings.resetMapChange):SetCheck(true)
 end
 
 

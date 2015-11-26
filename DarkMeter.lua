@@ -55,7 +55,8 @@ DarkMeter.settings = {
 		"damageDone",
 		"interrupts"
 	},
-	reportRows = 5								-- number of rows reported in chat
+	reportRows = 5,								-- number of rows reported in chat
+	resetMapChange = 2						-- integer value, can be: 1 (always), 2 (ask), 3 (never)
 }
 
 DarkMeter.specificFight = nil 					-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
@@ -282,10 +283,6 @@ function DarkMeter:resetData()
 end
 
 
--- calls ui prompt reset dialog (bound on world change)
-function DarkMeter:promptResetData()
-	UI.ResetForm:show()
-end
 
 
 -- main form refresh timer
