@@ -70,7 +70,6 @@ end
 
 
 function SettingsForm.controls:OnBarHeightChanged(wndH, wndC, fNewVal, fOldVal)
-  Print("CAMBIO!")
   local val = math.floor(fNewVal)
   SettingsForm.rowHeightBox:SetText(tostring(val))
   DarkMeter.settings.rowHeight = val
