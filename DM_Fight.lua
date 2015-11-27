@@ -25,6 +25,7 @@ function Fight:new()
   fight.startTime = GameLib.GetGameTime()
   fight.forcedName = nil            -- this is used to force a fight name like "Current fight" or "Overall data"
   fight.totalDuration = 0
+  fight.pvpMatch = false
 
 	self.__index = self
 	return setmetatable(fight, self)

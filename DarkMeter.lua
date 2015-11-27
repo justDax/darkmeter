@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.4.2"
+DarkMeter.version = "0.4.3"
 
 
 
@@ -35,7 +35,13 @@ local Group 														  -- current group variable
 local CombatUtils = {}
 
 
-DarkMeter.availableStats = {							-- list of what the user can monitor
+DarkMeter.specificFight = nil 						-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
+DarkMeter.paused = false
+DarkMeter.playerInPvPMatch =	false				-- true if player enters a pvp match, like bg or arena
+
+
+-- list of the stats the user can monitor
+DarkMeter.availableStats = {
 	"damageDone",
 	"overhealDone",
 	"healingDone",
@@ -45,7 +51,7 @@ DarkMeter.availableStats = {							-- list of what the user can monitor
 	"dps"
 }
 
--- settings, this is loaded and stored between logouts
+-- defaults settings, this table is overwritten on logins and stored on logouts
 DarkMeter.settings = {
 	overall = true,
 	mergePets = true,
@@ -57,11 +63,10 @@ DarkMeter.settings = {
 	},
 	reportRows = 5,								-- number of rows reported in chat
 	resetMapChange = 2,						-- integer value, can be: 1 (always), 2 (ask), 3 (never)
-	rowHeight = 26								-- mainform for height (from 20 to 50)
+	rowHeight = 26,								-- mainform row height (from 20 to 50)
+	mergePvpFights = true					-- if enebled and inside a pvp match, the currentFight will last untill the match is over, even when going out of combat
 }
 
-DarkMeter.specificFight = nil 					-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
-DarkMeter.paused = false
 
 -- list containing all events to register/unregister
 local combatLogEvents = {
@@ -143,14 +148,25 @@ function DarkMeter:OnLoad()
 	-- in case this happens, it means that the addon has been paused in the middle of a fight that is now over and I need to instantiate a new currentFight when the addon is resumed
 	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", DarkMeter)
 
+	-- register if a player is inside a pvp area
+	Apollo.RegisterEventHandler("MatchEntered", "OnPVPMatchEntered", self)
+	Apollo.RegisterEventHandler("MatchExited", "OnPVPMatchExited", self)
+	Apollo.RegisterEventHandler("MatchFinished", "OnPVPMatchFinished", self)
+	-- sets if the player is in a pvp match after loading the addon
+	if MatchingGame:GetPVPMatchState() ~= nil then
+		self.playerInPvPMatch = true
+	else
+		self.playerInPvPMatch = false
+	end
 
+	-- timer that auto refreshes the main form if necessary
 	Apollo.CreateTimer("MainFormRefresher", 1, true)
 	Apollo.RegisterTimerHandler("MainFormRefresher", "OnMainFormRefresher", self)
 
 	-- updates Group with a list of Unit instances, each unit is a group member
 	Group = Apollo.GetPackage("DarkMeter:Group").tPackage:new()					-- no more Group must me instantiated from now
-
 	self:updateGroup()
+
 	UI:init()
 end
 
@@ -168,7 +184,9 @@ end
 -----------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------
 
-
+-- called then the addon is loaded...
+-- override defaults settings
+-- set form position and columns
 function DarkMeter:OnRestore(eType, data)
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
 	for k, v in pairs(data) do
@@ -190,6 +208,7 @@ function DarkMeter:OnRestore(eType, data)
 	UI.MainForm:setTracked()
 end
 
+-- save settings on logout / reloadui
 function DarkMeter:OnSave(eType)
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
 	self.settings.mainFormLocation = UI.MainForm.form:GetLocation():ToTable()
@@ -197,6 +216,7 @@ function DarkMeter:OnSave(eType)
 end
 
 
+-- add a stat to track into the mainform
 function DarkMeter:addTracked(name, index)
 	for i = 1, #self.settings.selectedStats do
 		if self.settings.selectedStats[i] == name then
@@ -211,6 +231,7 @@ function DarkMeter:addTracked(name, index)
 	self:updateUI()
 end
 
+-- remove a stat to track into the mainform
 function DarkMeter:removeTracked(name)
 	local stats = self.settings.selectedStats
 	for i = 1, #stats do
@@ -368,11 +389,36 @@ function DarkMeter:OnUnitEnteredCombat(unit, inCombat)
 		if Group:inCombat() then
 			DarkMeter:startCombatIfNecessary()
 		elseif not Group:inCombat() and currentFight then
-			DarkMeter:stopCurrentFight()
+			DarkMeter:stopAllFights()
 		end
 	end
 	CombatUtils:updateCurrentFight()
 end
+
+
+----------------------------------
+-- handle pvp instances
+----------------------------------
+
+-- register if a player is inside a pvp match
+function DarkMeter:OnPVPMatchEntered()
+	self.playerInPvPMatch = true
+end
+
+-- archives if the player leaves before the end of the match
+function DarkMeter:OnPVPMatchExited()
+	if self.playerInPvPMatch then
+		self.playerInPvPMatch = false
+		DarkMeter:stopAllFights()
+	end
+end
+
+-- ensure that the pvp match is archived correctly at the end of the fight
+function DarkMeter:OnPVPMatchFinished()
+	self.playerInPvPMatch = false
+	DarkMeter:stopAllFights()
+end
+
 
 ----------------------------------
 -- combat log utils
@@ -394,13 +440,20 @@ end
 
 -- return a formatted combat action table
 function CombatUtils:formatCombatAction(e, customValues)
+	-- list of last 10 processed combat events, for development
 	table.insert(CombatUtils.Events, 1, e)
 	CombatUtils.Events[11] = nil
-	if _G.DarkMeter.Development then
+		if _G.DarkMeter.Development then
 		SendVarToRover("CapturedEvents", CombatUtils.Events)
 		SendVarToRover("lastLogEvent", e)
 	end
-	
+
+
+	-- force combat start if player is in combat (fix for a reloadui when in combat)
+	if Group.members[GameLib.GetPlayerUnit():GetId()].inCombat then
+		DarkMeter:startCombatIfNecessary()
+	end
+
 	customValues = customValues or {}
 
 	-- initialize common useful values
@@ -519,6 +572,15 @@ function DarkMeter:startCombatIfNecessary()
 	-- instantiate a new fight if out of combat
 	if not currentFight then
 		currentFight = Fight:new()
+		-- set pvpMatch to true if necessary
+		Print("PvpMatch: " .. tostring(self.playerInPvPMatch))
+		Print("Merge?: " .. tostring(self.settings.mergePvpFights))
+		-- I test directly against a MatchingGame:GetPVPMatchState()
+		if (self.playerInPvPMatch or MatchingGame:GetPVPMatchState() ~= nil) and self.settings.mergePvpFights then
+			Print("STARTO PVP!!!!")
+			currentFight.pvpMatch = true
+		end
+
 		currentFight.forcedName = "Current fight"
 	elseif currentFight:paused() then
 		currentFight:continue()
@@ -531,17 +593,38 @@ function DarkMeter:startCombatIfNecessary()
 	end
 end
 
+
+function DarkMeter:stopAllFightsIfNotInCombat()
+	if not Group:inCombat() then
+		DarkMeter:stopAllFights()
+	end
+end
+
+
 -- archive currentFight and sets it to nil
-function DarkMeter:stopCurrentFight()
+function DarkMeter:stopAllFights()
 	currentFight:stop()
 	overallFight:stop()
 
-	currentFight.forcedName = nil
-	-- check that the fight has at least a member to prevent inserting fights when nothing happens (a mob that aggro then evades without hitting)
-	if DMUtils.tableLength(currentFight.groupMembers) > 0 then
-		table.insert(fightsArchive, 1, DMUtils.cloneTable(currentFight))
+	-- if the player is in a pvp match and has chosen to treat the entire pvp match as an unique fight
+	-- opposite condition... need to check if the player is not in pvp or is in pvp but doesn't want to treat the match as an entire fight to reset the data
+	if not self.playerInPvPMatch or not self.settings.mergePvpFights then
+		if currentFight.pvpMatch then
+			local time = GameLib.GetLocalTime()
+			currentFight.forcedName = "PvP Match (" .. time.nHour .. ":" .. time.nMinute .. ")"
+			Print("FINITO!")
+			Print(currentFight.forcedName)
+		else
+			currentFight.forcedName = nil	
+		end
+		
+		-- check that the fight has at least a member to prevent inserting fights when nothing happens (a mob that aggro then evades without hitting)
+		if DMUtils.tableLength(currentFight.groupMembers) > 0 then
+			table.insert(fightsArchive, 1, DMUtils.cloneTable(currentFight))
+		end
+		currentFight = nil	
 	end
-	currentFight = nil
+
 	-- after 0.6 sec call an updateUI to check if the interface needs an update
 	ApolloTimer.Create(0.6, false, "updateUI", DarkMeter)
 end
@@ -559,11 +642,6 @@ end
 
 -- This event fires whenever a normal attack lands
 function DarkMeter:OnCombatLogDamage(e)
-	-- force combat start if player is in combat (fix for a reloadui when in combat)
-	if Group.members[GameLib.GetPlayerUnit():GetId()].inCombat then
-		DarkMeter:startCombatIfNecessary()
-	end
-	
 	if _G.DarkMeter.Development then
 		Print("DAMEIG!")
 	end

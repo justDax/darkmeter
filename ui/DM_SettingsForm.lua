@@ -60,6 +60,15 @@ function SettingsForm.controls:OnShowRanks()
   SettingsForm:reinitUI()
 end
 
+-- when enabled and inside a pvp match, the currentFight will last untill the match is over, even when going out of combat
+function SettingsForm.controls:MergePvPFights()
+  local btn = SettingsForm.buttons:FindChild("MergePvPFights")
+  DarkMeter.settings.mergePvpFights = btn:IsChecked()
+  DarkMeter:stopAllFightsIfNotInCombat()
+  SettingsForm:reinitUI()
+end
+
+
 function SettingsForm.controls:OnMapChangeReset(wndH, wndC, eBtn)
   if wndH == wndC then
     -- value can be 1 (always), 2 (ask), 3 (never)
@@ -134,6 +143,7 @@ function SettingsForm:setValuesFromSettings()
   self.buttons:FindChild("MergePets"):SetCheck(DarkMeter.settings.mergePets)
   self.buttons:FindChild("ShowRanks"):SetCheck(DarkMeter.settings.showRanks)
   self.buttons:FindChild("ShowClassIcon"):SetCheck(DarkMeter.settings.showClassIcon)
+  self.buttons:FindChild("MergePvPFights"):SetCheck(DarkMeter.settings.mergePvpFights)
   self.buttons:FindChild("ResetFightBox"):FindChild("ResetFight" .. DarkMeter.settings.resetMapChange):SetCheck(true)
   self.rowHeightSlider:SetValue(DarkMeter.settings.rowHeight)
   self.rowHeightBox:SetText(DarkMeter.settings.rowHeight)
