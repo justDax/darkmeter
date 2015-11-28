@@ -573,11 +573,8 @@ function DarkMeter:startCombatIfNecessary()
 	if not currentFight then
 		currentFight = Fight:new()
 		-- set pvpMatch to true if necessary
-		Print("PvpMatch: " .. tostring(self.playerInPvPMatch))
-		Print("Merge?: " .. tostring(self.settings.mergePvpFights))
 		-- I test directly against a MatchingGame:GetPVPMatchState()
 		if (self.playerInPvPMatch or MatchingGame:GetPVPMatchState() ~= nil) and self.settings.mergePvpFights then
-			Print("STARTO PVP!!!!")
 			currentFight.pvpMatch = true
 		end
 
@@ -612,7 +609,6 @@ function DarkMeter:stopAllFights()
 		if currentFight.pvpMatch then
 			local time = GameLib.GetLocalTime()
 			currentFight.forcedName = "PvP Match (" .. time.nHour .. ":" .. time.nMinute .. ")"
-			Print("FINITO!")
 			Print(currentFight.forcedName)
 		else
 			currentFight.forcedName = nil	
