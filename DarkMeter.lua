@@ -34,7 +34,7 @@ local fightsArchive = {}									-- table with all the previous fights (from the
 local Group 														  -- current group variable
 local CombatUtils = {}
 
-
+DarkMeter.initialized = false							-- this flag will be set to true when the addon hasn been loaded and the ui initialized
 DarkMeter.specificFight = nil 						-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
 DarkMeter.paused = false
 DarkMeter.playerInPvPMatch =	false				-- true if player enters a pvp match, like bg or arena
@@ -117,7 +117,11 @@ function DarkMeter:OnLoad()
 	-- load form file
 	self.xmlDoc = XmlDoc.CreateFromFile("DarkMeter.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
-	
+end
+
+-- after form has been loaded
+function DarkMeter:OnDocLoaded()
+	Apollo.LoadSprites("DM_Sprites.xml", "DM_Sprites")
 
 	-- external classes
 	DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
@@ -168,13 +172,13 @@ function DarkMeter:OnLoad()
 	self:updateGroup()
 
 	UI:init()
-end
 
--- after form has been loaded
-function DarkMeter:OnDocLoaded()
-	Apollo.LoadSprites("DM_Sprites.xml", "DM_Sprites")
 	-- the xml file reference is no longer needed
 	self.xmlDoc = nil
+	self.initialized = true
+	if not self.settingsLoaded then
+		DarkMeter:restoreAfterInitialized()
+	end
 end
 
 
@@ -192,20 +196,26 @@ function DarkMeter:OnRestore(eType, data)
 	for k, v in pairs(data) do
 		self.settings[k] = v
 	end
+	-- if the main addon parts has been loaded, set the window location and tracked
+	if self.initialized then
+		self:restoreAfterInitialized()
+	end
+end
 
-	self.loaded = true
-
-	if data.mainFormLocation ~= nil then
+-- apply restored settings, this is called after the addon has been initialized AND after the onRestore event
+function DarkMeter:restoreAfterInitialized()
+	if self.settings.mainFormLocation ~= nil then
 		-- if mainform window has been initialized, set its position, else set var and let the ui initialize the form position
 		if UI.MainForm.form ~= nil then
-			UI.MainForm.form:MoveToLocation(WindowLocation:new(MainForm.initialLocation))
+			UI.MainForm.form:MoveToLocation(WindowLocation.new(self.settings.mainFormLocation))
 			UI.MainForm:initColumns()
 			UI.MainForm.wrapper:RecalculateContentExtents()
 		else
-			UI.MainForm.initialLocation = data.mainFormLocation
+			UI.MainForm.initialLocation = self.settings.mainFormLocation
 		end
 	end
 	UI.MainForm:setTracked()
+	self.settingsLoaded = true
 end
 
 -- save settings on logout / reloadui
