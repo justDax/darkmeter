@@ -775,7 +775,7 @@ function PlayerDetails.botControls:deathRecapFor(data)
     PlayerDetails.botControls.deathRecapRows = {}
   end
   for i = 1, #PlayerDetails.botControls.deathRecapRows do
-    PlayerDetails.botControls.deathRecapRows[i]:destroy()
+    PlayerDetails.botControls.deathRecapRows[i]:Destroy()
     PlayerDetails.botControls.deathRecapRows[i] = nil
   end
 
