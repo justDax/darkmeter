@@ -325,23 +325,23 @@ function Unit:statsPercentages(sStat)
     
 
     local percentages = {}
-    if multi + multicrit > 0 then
-      percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
+    if multi > 0 then
+      percentages.multihits = multi / total *100
     else
       percentages.multihits = 0
     end
     if multicrit > 0 then
-      percentages.multicrits = multicrit / (multi + multicrit) * 100
+      percentages.multicrits = multicrit / multi * 100
     else
       percentages.multicrits = 0
     end
-    if crit + multicrit > 0 then
-      percentages.crits = (crit + multicrit) / total * 100
+    if crit > 0 then
+      percentages.crits = crit / total * 100
     else
       percentages.crits = 0
     end
     if key == "damage" then
-      percentages.deflects = deflects / total * 100
+      percentages.deflects = deflects / (total + multicrit + multi) * 100
     end
     percentages.attacks = total
     return percentages

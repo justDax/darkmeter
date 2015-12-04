@@ -153,6 +153,7 @@ function DarkMeter:OnDocLoaded()
 	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", DarkMeter)
 
 	-- register if a player is inside a pvp area
+	-- TODO the match event also fires for expeditions!
 	Apollo.RegisterEventHandler("MatchEntered", "OnPVPMatchEntered", self)
 	Apollo.RegisterEventHandler("MatchExited", "OnPVPMatchExited", self)
 	Apollo.RegisterEventHandler("MatchFinished", "OnPVPMatchFinished", self)

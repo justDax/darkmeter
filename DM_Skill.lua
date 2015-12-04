@@ -14,7 +14,7 @@ function Skill:new()
       total = 0,
       hits = {},
       crits = {},
-      multihits = {},
+      multihits = {},                 -- multihits can contain false values, these are added on multihit deflects
       multicrits = {}
     },
     heals = {
@@ -78,11 +78,18 @@ end
 
 -- process a damaging skill
 function Skill:ProcessDamage(skill)
-  self.damage.total = self.damage.total + 1
+  if not skill.multihit then
+    self.damage.total = self.damage.total + 1
+  end
 
   -- deflect
   if skill.state == GameLib.CodeEnumCombatResult.Avoid then
     self.damage.deflects = self.damage.deflects + 1
+    -- if the deflected hit is a multihit, I have to keep track of the multihits counts, but I must also eliminate the deflects from the average, max and min damage calculations
+    -- I'll add the special value false to the array of multihits damages, this value will be ignored when calcumating a skill's max, min and avg damage
+    if skill.multihit then
+      table.insert(self.damage.multihits, false)
+    end
   -- crit
   elseif skill.state == GameLib.CodeEnumCombatResult.Critical then
     if skill.multihit then
@@ -105,7 +112,10 @@ end
 
 -- process an healing skill
 function Skill:ProcessHeal(skill)
-  self.heals.total = self.heals.total + 1
+  if not skill.multihit then
+    self.heals.total = self.heals.total + 1
+  end
+  
 
   -- crit
   if skill.state == GameLib.CodeEnumCombatResult.Critical then
@@ -183,30 +193,30 @@ function Skill:statsPercentages(sStat)
     local crit = #self[key].crits
 
     local percentages = {}
-    if multi + multicrit > 0 then
-      percentages.multihitsCount = multi + multicrit
-      percentages.multihits = (multi + multicrit) / (total - multi - multicrit) *100
+    if multi > 0 then
+      percentages.multihitsCount = multi
+      percentages.multihits = multi / total *100
     else
       percentages.multihitsCount = 0
       percentages.multihits = 0
     end
     if multicrit > 0 then
       percentages.multicritsCount = multicrit
-      percentages.multicrits = multicrit / (multi + multicrit) * 100
+      percentages.multicrits = multicrit / total * 100
     else
       percentages.multicritsCount = 0
       percentages.multicrits = 0
     end
-    if crit + multicrit > 0 then
-      percentages.critsCount = crit + multicrit
-      percentages.crits = (crit + multicrit) / total * 100
+    if crit > 0 then
+      percentages.critsCount = crit
+      percentages.crits = crit / total * 100
     else
       percentages.critsCount = 0
       percentages.crits = 0
     end
     if key == "damage" and self.damage.deflects > 0 then
       percentages.deflectsCount = self.damage.deflects
-      percentages.deflects = self.damage.deflects / total * 100
+      percentages.deflects = self.damage.deflects / (total + multi + multicrit) * 100
     elseif key == "damage" then
       percentages.deflectsCount = 0
       percentages.deflects = 0
@@ -235,17 +245,19 @@ for _, st in pairs({"damageDone", "healingDone", "overhealDone", "rawhealDone"})
         local i = 0
         tmp[k] = 0
         for _, amount in pairs(v) do
-          if st == "damageDone" then
-            tmp[k] = tmp[k] + amount
-          elseif st == "healingDone" then
-            tmp[k] = tmp[k] + amount.heal
-          elseif st == "overhealDone" then
-            tmp[k] = tmp[k] + amount.oHeal
-          elseif st == "rawhealDone" then
-            tmp[k] = tmp[k] + amount.heal + amount.oHeal
-          end
+          if amount ~= false then
+            if st == "damageDone" then
+              tmp[k] = tmp[k] + amount
+            elseif st == "healingDone" then
+              tmp[k] = tmp[k] + amount.heal
+            elseif st == "overhealDone" then
+              tmp[k] = tmp[k] + amount.oHeal
+            elseif st == "rawhealDone" then
+              tmp[k] = tmp[k] + amount.heal + amount.oHeal
+            end
 
-          i = i + 1
+            i = i + 1
+          end
         end
         if tmp[k] > 0 then
           tmp[k] = tmp[k] / i
@@ -265,14 +277,16 @@ for _, st in pairs({"damageDone", "healingDone", "overhealDone", "rawhealDone"})
         local arr = {}
 
         for _, amount in pairs(v) do
-          if st == "damageDone" then
-            table.insert(arr, amount) 
-          elseif st == "healingDone" then
-            table.insert(arr, amount.heal)
-          elseif st == "overhealDone" then
-            table.insert(arr, amount.oHeal)
-          elseif st == "rawhealDone" then
-            table.insert(arr, (amount.heal + amount.oHeal))
+          if amount ~= false then
+            if st == "damageDone" then
+              table.insert(arr, amount) 
+            elseif st == "healingDone" then
+              table.insert(arr, amount.heal)
+            elseif st == "overhealDone" then
+              table.insert(arr, amount.oHeal)
+            elseif st == "rawhealDone" then
+              table.insert(arr, (amount.heal + amount.oHeal))
+            end
           end
         end
         if #arr > 0 then
@@ -294,14 +308,16 @@ for _, st in pairs({"damageDone", "healingDone", "overhealDone", "rawhealDone"})
         local arr = {}
 
         for _, amount in pairs(v) do
-          if st == "damageDone" then
-            table.insert(arr, amount) 
-          elseif st == "healingDone" then
-            table.insert(arr, amount.heal)
-          elseif st == "overhealDone" then
-            table.insert(arr, amount.oHeal)
-          elseif st == "rawhealDone" then
-            table.insert(arr, (amount.heal + amount.oHeal))
+          if amount ~= false then
+            if st == "damageDone" then
+              table.insert(arr, amount) 
+            elseif st == "healingDone" then
+              table.insert(arr, amount.heal)
+            elseif st == "overhealDone" then
+              table.insert(arr, amount.oHeal)
+            elseif st == "rawhealDone" then
+              table.insert(arr, (amount.heal + amount.oHeal))
+            end
           end
         end
         if #arr > 0 then

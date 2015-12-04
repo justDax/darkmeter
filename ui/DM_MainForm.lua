@@ -299,7 +299,7 @@ end
 -- sets the current tracked fight
 function MainForm:setTracked()
   local text = ""
-  if DarkMeter and DarkMeter.loaded then
+  if DarkMeter and DarkMeter.initialized then
     if DarkMeter.settings.overall then
       text = "- Overall"
     elseif not DarkMeter.specificFight then
