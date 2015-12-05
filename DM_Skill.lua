@@ -61,7 +61,7 @@ function Skill:add(formattedSkill)
   end
 
   -- damage skill
-  if formattedSkill.typology == "damage"and not formattedSkill.fallingDamage then
+  if formattedSkill.typology == "damage"and not formattedSkill.selfDamage then
     self:ProcessDamage(formattedSkill)
   -- healing skill
   elseif formattedSkill.typology == "healing" then

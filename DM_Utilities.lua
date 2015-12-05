@@ -34,7 +34,7 @@ function DMUtils:iconForClass(unit)
     return "BK3:UI_Icon_CharacterCreate_Class_" .. iconSprite
   -- pets icons
   elseif unit.pet then -- artillery bot
-    if unit.name == "Artyllery Bot" then
+    if unit.name == "Artillerybot" then
     	return "IconSprites:Icon_SkillEngineer_Artillery_Bot"
     elseif unit.name == "Geist" then -- esper geist
     	return "IconSprites:Icon_SkillEsper_Geist"

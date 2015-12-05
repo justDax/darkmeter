@@ -45,19 +45,27 @@ function Fight:addUnit(wsUnit, groupMember)
     return false
   else
     -- if the unit is not a pet and a unit with this name exists among the actual group members, it might be a player that crashed with the same name, but after relog now has a different id
+    -- this also is used when changing zones...
     -- tldr... merge groupMembers that are not pets with the same name
     if groupMember and not wsUnit:GetUnitOwner() then
       for id, unit in pairs(self.groupMembers) do
         if unit.name == unitName then
-          local newUnit = Unit:new(wsUnit)
-          newUnit.skills = DMUtils.cloneTable(unit.skills)
+          -- -- create a new unit that is the clone of the previous unit with the same name
+          local newUnit = DMUtils.cloneTable(unit)
+          newUnit.wsUnit = wsUnit
+          newUnit.id = unitId
+          -- delete old unit and add new one to the groupMembers
           self.groupMembers[id] = nil
           self.groupMembers[newUnit.id] = newUnit
+          break
         end
       end
     end
 
-    self[unitTable][unitId] = Unit:new(wsUnit)
+    -- adds a new unit if no old unit has been merged
+    if self[unitTable][unitId] == nil then
+      self[unitTable][unitId] = Unit:new(wsUnit)
+    end
     if self[unitTable][unitId].pet then
       self:addUnit(self[unitTable][unitId].owner, groupMember)
     end

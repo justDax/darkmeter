@@ -49,18 +49,23 @@ end
 
 -- timer funtions used to calculate stats/second
 function Unit:startFight()
-  self.startTime = GameLib.GetGameTime()
-  self.stopTime = nil
-  for name, unit in pairs(self.pets) do
-    unit:startFight()
+  if self.startTime == nil then
+    self.startTime = GameLib.GetGameTime()
+    self.stopTime = nil
+    for name, unit in pairs(self.pets) do
+      unit:startFight()
+    end
   end
 end
 
 function Unit:stopFight()
-  self.stopTime = GameLib.GetGameTime()
-  self.totalFightTime = self.totalFightTime + (self.stopTime - self.startTime)
-  for name, unit in pairs(self.pets) do
-    unit:stopFight()
+  if self.stopTime == nil and self.startTime ~= nil then
+    self.stopTime = GameLib.GetGameTime()
+    self.totalFightTime = self.totalFightTime + (self.stopTime - self.startTime)
+    for name, unit in pairs(self.pets) do
+      unit:stopFight()
+    end
+    self.startTime = nil
   end
 end
 
@@ -93,7 +98,7 @@ end
 -- adds a skill to the caster unit
 function Unit:addSkill(skill)
   -- special condition, ignore falling damage, as it gets added also as skilltaken
-  if not skill.fallingDamage then
+  if not skill.selfDamage then
     if not self.skills[skill.name] then
       self.skills[skill.name] = Skill:new()
     end
@@ -331,7 +336,7 @@ function Unit:statsPercentages(sStat)
       percentages.multihits = 0
     end
     if multicrit > 0 then
-      percentages.multicrits = multicrit / multi * 100
+      percentages.multicrits = multicrit / total * 100
     else
       percentages.multicrits = 0
     end

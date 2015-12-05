@@ -15,7 +15,6 @@ DarkMeter.version = "0.4.4"
 if _G.DarkMeter == nil then _G.DarkMeter = {} end
 -- enable prints and rover debugging
 _G.DarkMeter.Development = false
-
 -----------------------------------------------------------------------------------------------
 -- Class Variables
 -----------------------------------------------------------------------------------------------
@@ -140,10 +139,12 @@ function DarkMeter:OnDocLoaded()
 	
 	-- asks it the user wants to reset the data on world change
 	Apollo.RegisterEventHandler("ChangeWorld", "promptResetData", UI)
-	-- updates the group when changing zone
-	Apollo.RegisterEventHandler("ChangeWorld", "updateGroup", self)
 	-- stop all fights when changing zone, this is needed if a player accepts a dungeon, shiphand, bg invite etc. while in combat
 	Apollo.RegisterEventHandler("ChangeWorld", "stopAllFights", self)
+	-- updates the group when changing zone
+	Apollo.RegisterEventHandler("ChangeWorld", "delayedUpdateGroup", self)
+	-- updates the group when player changes (houston says: Fires when the player first logs in, that's not true, this event gets fired whenever the player unit changes for example when entering Star Comm-Basin )
+	Apollo.RegisterEventHandler("PlayerChanged", "updateGroup", self)
 	
 
 	for i = 1, #combatLogEvents do
@@ -189,7 +190,6 @@ function DarkMeter:OnDocLoaded()
 		DarkMeter:restoreAfterInitialized()
 	end
 end
-
 
 -----------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------
@@ -379,6 +379,12 @@ end
 ----------------------------------
 -- update group
 ----------------------------------
+
+-- yet another timer to delay an action... the group is not fully loaded probably on the worldchange event trigger
+function DarkMeter:delayedUpdateGroup()
+	ApolloTimer.Create(0.3, false, "updateGroup", self)
+end
+
 function DarkMeter:updateGroup()
 	local groupMembersCount = GroupLib.GetMemberCount()
 
@@ -530,7 +536,8 @@ function CombatUtils:formatCombatAction(e, customValues)
 		heal = (e.nHealAmount or 0),
 		overheal = (e.nOverheal or 0),
 		owner = e.unitCasterOwner,
-		targetkilled = e.bTargetKilled
+		targetkilled = e.bTargetKilled,
+		selfDamage = false
 	}
 
 	-- add info about the caster
@@ -562,6 +569,11 @@ function CombatUtils:formatCombatAction(e, customValues)
 	event.__index = event
 	setmetatable(customValues, event)
 	
+	-- checks if the skill is a self damaging skill
+	if customValues.target and customValues.caster and customValues.targetId == customValues.casterId then
+		customValues.selfDamage = true
+	end
+
 	if _G.DarkMeter.Development then
 		table.insert(CombatUtils.formattedSkills, 1, customValues)
 		CombatUtils.formattedSkills[11] = nil
@@ -574,23 +586,63 @@ end
 -- add the caster or the target of a skill, if a group member is involved (is the caster or the target)
 function CombatUtils:addUnitsToFight(skill)
 	for _, fight in pairs({currentFight, overallFight}) do
-		-- if the caster is a group member
-		if Group.members[skill.casterId] ~= nil then
-			fight:addUnit(skill.caster, true)
-			fight:addUnit(skill.target, false)
-		-- the target is the pet of a group member
-		elseif skill.ownerId ~= nil and Group.members[skill.ownerId] ~= nil then
-			-- add owner
-			if Group.members[skill.ownerId] ~= nil then
-				fight:addUnit(skill.owner, true)
-			end
-			fight.groupMembers[skill.ownerId]:addPet(skill.caster)
-			fight:addUnit(skill.target, false)
 
-		-- if the target is a group member, the caster is an enemy
-		elseif Group.members[skill.targetId] ~= nil then
-			fight:addUnit(skill.caster, false)
-			fight:addUnit(skill.target, true)
+		-- process a skill's caster
+		if skill.caster then
+			-- if the target is a group member
+			if Group.members[skill.casterId] ~= nil then
+				fight:addUnit(skill.caster, true)
+			-- if the caster is a pet and the owner is a group member
+			elseif skill.ownerId ~= nil and Group.members[skill.ownerId] ~= nil then
+				-- add owner
+				fight:addUnit(skill.owner, true)
+				-- add pet
+				fight.groupMembers[skill.ownerId]:addPet(skill.caster)
+			
+			-- the caster is an enemy (this is not completely true, let's take the case where another friendly player heals you and he is not grouped with you, he will be added as an enemy but since his contribution to your damage received is 0, he'll never appear among the enemies)
+			else
+				-- if is an enemy's pet
+				if skill.ownerId ~= nil then
+					-- add pet's owner
+					fight:addUnit(skill.owner, false)
+					-- add pet
+					fight.enemies[skill.ownerId]:addPet(skill.caster)
+				-- if the caster is a common enemy
+				else
+					fight:addUnit(skill.caster, false)
+				end
+
+			end
+		end
+
+		-- process skill's target
+		if skill.target then
+			local targetOwner = skill.target:GetUnitOwner()
+			-- if the target is a group member
+			if Group.members[skill.targetId] ~= nil then
+				-- add the target to the fight's members
+				fight:addUnit(skill.target, true)
+			
+			-- if the target is a pet of a group member, add both
+			elseif targetOwner and Group.members[targetOwner:GetId()] then
+				-- add pet's owner
+					fight:addUnit(targetOwner, true)
+					-- add pet
+					fight.groupMembers[targetOwner:GetId()]:addPet(skill.target)
+
+			-- if the caster or the caster's owner is not a group member, then the spell's target is an
+			else
+				-- if is an enemy's pet
+				if targetOwner then
+					-- add pet's owner
+					fight:addUnit(targetOwner, false)
+					-- add pet
+					fight.enemies[targetOwner:GetId()]:addPet(skill.target)
+				-- if the caster is a common enemy
+				else
+					fight:addUnit(skill.target, false)
+				end
+			end
 		end
 	end
 end
