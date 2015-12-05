@@ -341,7 +341,11 @@ function Unit:statsPercentages(sStat)
       percentages.crits = 0
     end
     if key == "damage" then
-      percentages.deflects = deflects / (total + multicrit + multi) * 100
+      if deflects > 0 then
+        percentages.deflects = deflects / (total + multicrit + multi) * 100
+      else
+        percentages.deflects = 0
+      end
     end
     percentages.attacks = total
     return percentages

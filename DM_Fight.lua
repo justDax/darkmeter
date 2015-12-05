@@ -171,7 +171,10 @@ function Fight:name()
   local topUnit = nil
   for _, unit in pairs(self.enemies) do
     topUnit = topUnit or unit
-    if unit.rank > topUnit.rank then
+    -- TODO check IsInYourGroup() for errors
+    -- I've implemented this part because in some fights vs some real mobs, I've found my own name as the fight's name
+    -- maybe is something generated from some strange buff or an attack reflected pheraps?
+    if unit.rank > topUnit.rank and not unit.wsUnit:IsInYourGroup() then
       topUnit = unit
     end
   end

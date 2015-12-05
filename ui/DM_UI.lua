@@ -219,6 +219,7 @@ end
 function UI:resetData()
   DarkMeter:resetData()
   MainForm:clear()
+  MainForm.fightTimer:SetText("-")
   UI.lastFight = nil
 end
 

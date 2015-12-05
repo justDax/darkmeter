@@ -111,6 +111,25 @@ function DMUtils.roundToNthDecimal(num, n)
   return math.floor(num * mult + 0.5) / mult
 end
 
+
+--------------------------
+-- Match utils
+--------------------------
+
+function DMUtils.playerInPvPMatch()
+  local eType = MatchingGame:GetMatchingGameType()
+
+  if eType then
+    local matches = {"Arena", "Battleground", "OpenArena", "RatedBattleground", "Warplot"}
+
+    for name, code in pairs(MatchingGame.MatchType) do
+      if eType == code and DMUtils.indexOf(matches, name) ~= nil then return true end
+    end
+  end
+
+  return false
+end
+
 --------------------------
 -- Tables utils
 --------------------------
@@ -155,6 +174,13 @@ function DMUtils.cloneTable(t)
   return target
 end
 
+-- return index of element inside an array, nil if not present
+function DMUtils.indexOf(t, el)
+  for i = 1, #t do
+    if t[i] == el then return i end
+  end
+  return nil
+end
 
 
 Apollo.RegisterPackage(DMUtils, "DarkMeter:Utils", 1, {"DarkMeter:Icons"})

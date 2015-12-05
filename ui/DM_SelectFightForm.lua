@@ -83,17 +83,13 @@ end
 function SelectFight.controls:OnOverall()
   DarkMeter.settings.overall = true
   DarkMeter.specificFight = nil
-  DarkMeter:updateUI()
-  UI.MainForm:setTracked()
-  SelectFight:hide()
+  SelectFight:commonUIUpdate()
 end
 
 function SelectFight.controls:OnCurrent()
   DarkMeter.settings.overall = false
   DarkMeter.specificFight = nil
-  DarkMeter:updateUI()
-  UI.MainForm:setTracked()
-  SelectFight:hide()
+  SelectFight:commonUIUpdate()
 end
 
 -- btn functions from 1 to 5
@@ -101,10 +97,21 @@ for i = 1, 5 do
   SelectFight.controls["OnFightBtn"..i] = function()
     DarkMeter.settings.overall = false
     DarkMeter.specificFight = DarkMeter:specificFightByIndex(i)
-    DarkMeter:updateUI()
-    UI.MainForm:setTracked()
-    SelectFight:hide()
+    SelectFight:commonUIUpdate()
   end
 end
+
+
+-- common function that will update the ui with the new selected fight
+function SelectFight:commonUIUpdate()
+  DarkMeter:updateUI()
+  UI.MainForm:setTracked()
+  SelectFight:hide()
+  DarkMeter:OnMonitoredFightTimer()
+  if UI.PlayerDetails.visible then
+    UI.PlayerDetails:hide()
+  end
+end
+
 
 Apollo.RegisterPackage(SelectFight, "DarkMeter:SelectFight", 1, {"DarkMeter:UI"})

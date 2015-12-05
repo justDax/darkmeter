@@ -87,7 +87,7 @@ end
 function ReportForm.controls:OnOther()
   local channel = ReportForm.form:FindChild("Channels"):FindChild("OtherChannel"):GetText()
   if string.len(channel) == 0 then
-    Print("Please select a channel")
+    ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "Please select a channel", "DarkMeter")
   end
   ReportForm.report(channel)
 end
@@ -96,7 +96,7 @@ end
 function ReportForm.controls:OnWhisper()
   local target = ReportForm.form:FindChild("Channels"):FindChild("WhisperTo"):GetText()
   if string.len(target) == 0 then
-    Print("Please select a target to whisper to")
+    ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "Please write the name of the target to whisper to", "DarkMeter")
     return
   end
   ReportForm.report("w " .. target)
@@ -104,8 +104,8 @@ end
 
 -- write report on chat
 function ReportForm.report(channel)
-  if not UI.lastFight then 
-    Print("No last fight!")
+  if not UI.lastFight then
+    ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "No fights to report", "DarkMeter")
     return 
   end
 

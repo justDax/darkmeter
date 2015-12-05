@@ -37,6 +37,12 @@ function MainForm:init(xmlDoc)
   self.title = self.header:FindChild("Title")
   self.tracked = self.header:FindChild("Tracked")
 
+  -- footer parts
+  self.resumeBtn = MainForm.footer:FindChild("Resume")
+  self.pauseBtn = MainForm.footer:FindChild("Pause")
+  self.fightDuration = self.footer:FindChild("FightDuration")
+  self.fightTimer = self.fightDuration:FindChild("Timer")
+
   MainForm:initColumns()
   self:setTracked()
   UI:show()
@@ -47,6 +53,7 @@ end
 -- closes the main window, all subwindows and remove event listeners
 function MainForm.controls:OnCancel()
   DarkMeter:pause()
+  UI:hide()
 end
 
 
@@ -56,9 +63,12 @@ function MainForm.controls:OnResetData()
 end
 
 -- when resizing window
-function MainForm.controls:OnResize()
-  MainForm:initColumns()
-  MainForm:showGroupStats()
+function MainForm.controls:OnResize(wndH, wndC)
+  -- prevent reinitializing everything on drag
+  if wndH == wndC and not MainForm.dragging then
+    MainForm:initColumns()
+    MainForm:showGroupStats()
+  end
 end
 
 -- drag window functions
@@ -73,9 +83,13 @@ function MainForm.controls:OnStartDrag()
   }
 
   local x, y = MainForm.form:GetAnchorOffsets()
+  local width = MainForm.form:GetWidth()
+  local height = MainForm.form:GetHeight()
   MainForm.controls.startPosition = {
     x = x,
-    y = y
+    y = y,
+    width = width,
+    height = height
   }
 end
 
@@ -83,14 +97,14 @@ function MainForm.controls:OnStopDrag()
   MainForm.dragging = false
 end
 
-function MainForm.controls:OnMouseMove()
-  if MainForm.dragging then
+function MainForm.controls:OnMouseMove(wndH, wndC)
+  if MainForm.dragging and wndH == wndC then
     local mousePos = Apollo.GetMouse()
     
     local newOffsetX = mousePos.x - MainForm.controls.mousePosition.x + MainForm.controls.startPosition.x
     local newOffsetY = mousePos.y - MainForm.controls.mousePosition.y + MainForm.controls.startPosition.y
 
-    MainForm.form:SetAnchorOffsets(newOffsetX, newOffsetY, (newOffsetX + MainForm.form:GetWidth()), (newOffsetY + MainForm.form:GetHeight()) )
+    MainForm.form:SetAnchorOffsets(newOffsetX, newOffsetY, (newOffsetX + MainForm.controls.startPosition.width), (newOffsetY + MainForm.controls.startPosition.height) )
   end
 end
 
@@ -116,6 +130,19 @@ end
 
 
 
+
+-- popup to report the inspected fight
+function MainForm.controls:OnPause()
+  DarkMeter:pause()
+  MainForm.pauseBtn:Show(false)
+  MainForm.resumeBtn:Show(true)
+end
+
+function MainForm.controls:OnResume()
+  DarkMeter:resume()
+  MainForm.pauseBtn:Show(true)
+  MainForm.resumeBtn:Show(false)
+end
 
 
 -------------------------------------------------------------

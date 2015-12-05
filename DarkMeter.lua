@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.4.3"
+DarkMeter.version = "0.4.4"
 
 
 
@@ -140,9 +140,11 @@ function DarkMeter:OnDocLoaded()
 	
 	-- asks it the user wants to reset the data on world change
 	Apollo.RegisterEventHandler("ChangeWorld", "promptResetData", UI)
-	-- TODO - sometimes the group bugs when changing zone, pheraps the unit does't exists yet on the moment this event gets called? I need to test this one
-	-- TODO - I might need to add a delay to the group update then...
+	-- updates the group when changing zone
 	Apollo.RegisterEventHandler("ChangeWorld", "updateGroup", self)
+	-- stop all fights when changing zone, this is needed if a player accepts a dungeon, shiphand, bg invite etc. while in combat
+	Apollo.RegisterEventHandler("ChangeWorld", "stopAllFights", self)
+	
 
 	for i = 1, #combatLogEvents do
 		Apollo.RegisterEventHandler(combatLogEvents[i], "On" .. combatLogEvents[i], DarkMeter)
@@ -152,11 +154,12 @@ function DarkMeter:OnDocLoaded()
 	-- in case this happens, it means that the addon has been paused in the middle of a fight that is now over and I need to instantiate a new currentFight when the addon is resumed
 	Apollo.RegisterEventHandler("UnitEnteredCombat", "OnUnitEnteredCombat", DarkMeter)
 
-	-- register if a player is inside a pvp area
-	-- TODO the match event also fires for expeditions!
-	Apollo.RegisterEventHandler("MatchEntered", "OnPVPMatchEntered", self)
-	Apollo.RegisterEventHandler("MatchExited", "OnPVPMatchExited", self)
-	Apollo.RegisterEventHandler("MatchFinished", "OnPVPMatchFinished", self)
+	-- register when a player enters a match, a match is:
+	-- Battleground, Dungeon, Adventure, Arena, Warplot, RatedBattleground, OpenArena, Event, Shiphand 
+	Apollo.RegisterEventHandler("MatchEntered", "OnMatchEntered", self)
+	Apollo.RegisterEventHandler("MatchExited", "OnMatchExited", self)
+	Apollo.RegisterEventHandler("MatchFinished", "OnMatchFinished", self)
+
 	-- sets if the player is in a pvp match after loading the addon
 	if MatchingGame:GetPVPMatchState() ~= nil then
 		self.playerInPvPMatch = true
@@ -165,8 +168,13 @@ function DarkMeter:OnDocLoaded()
 	end
 
 	-- timer that auto refreshes the main form if necessary
-	Apollo.CreateTimer("MainFormRefresher", 1, true)
+	Apollo.CreateTimer("MainFormRefresher", 0.5, true)
 	Apollo.RegisterTimerHandler("MainFormRefresher", "OnMainFormRefresher", self)
+
+	-- timer that refreshes monitored fight duration
+	Apollo.CreateTimer("MonitoredFightTimer", 0.5, true)
+	Apollo.RegisterTimerHandler("MonitoredFightTimer", "OnMonitoredFightTimer", self)
+	Apollo.StopTimer("MonitoredFightTimer")
 
 	-- updates Group with a list of Unit instances, each unit is a group member
 	Group = Apollo.GetPackage("DarkMeter:Group").tPackage:new()					-- no more Group must me instantiated from now
@@ -188,6 +196,17 @@ end
 -- Functions
 -----------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------
+
+
+function DarkMeter:checkCombatLogOthers()
+	local disableOthers = Apollo.GetConsoleVariable("cmbtlog.disableOtherPlayers")
+	if disableOthers then
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "to work properly, I need the option \"Log OtherPlayers\" to be enabled.", "DarkMeter")
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "Please press \"Esc\", click on the \"Combat Log\" button inside your left menu and check the first option.", "DarkMeter")
+	end
+end
+
+
 
 -- called then the addon is loaded...
 -- override defaults settings
@@ -217,6 +236,7 @@ function DarkMeter:restoreAfterInitialized()
 	end
 	UI.MainForm:setTracked()
 	self.settingsLoaded = true
+	DarkMeter:checkCombatLogOthers()
 end
 
 -- save settings on logout / reloadui
@@ -275,9 +295,7 @@ function DarkMeter:pause()
 		fight:stop()
 	end
 
-	self.paused = true
-	UI:hide()
-
+	DarkMeter.paused = true
 end
 
 function DarkMeter:resume()
@@ -291,15 +309,16 @@ function DarkMeter:resume()
 		self:startCombatIfNecessary()
 	end
 
-	self.paused = false
-	UI:show()
+	DarkMeter.paused = false
 end
 
 function DarkMeter:toggle()
-	if self.paused then
+	if DarkMeter.paused then
 		self:resume()
+		UI:show()
 	else
 		self:pause()
+		UI:hide()
 	end
 end
 
@@ -321,8 +340,38 @@ end
 -- main form refresh timer
 function DarkMeter:OnMainFormRefresher()
 	local deltaTime = GameLib.GetGameTime() - UI.lastUpdate
-	if Group:inCombat() and deltaTime >= 1 then
+	if Group:inCombat() and deltaTime >= 0.5 then
 		self:updateUI()
+	end
+end
+
+
+-- set the timer responsable to refresh the main form's monitored fight duration
+function DarkMeter:startMonitoredFightTimer()
+	Apollo.StartTimer("MonitoredFightTimer")
+end
+
+-- destroy the monitored fight timer
+function DarkMeter:stopMonitoredFightTimer()
+	Apollo.StopTimer("MonitoredFightTimer")
+end
+
+
+-- function called by the monitored fight's timer to update the monitored fight duration
+function DarkMeter:OnMonitoredFightTimer()
+	local monitoredFight = nil
+	if self.settings.overall and overallFight then
+		monitoredFight = overallFight
+	elseif not self.specificFight and currentFight then
+		monitoredFight = currentFight
+	elseif self.specificFight then
+		monitoredFight = self.specificFight
+	end
+
+	if monitoredFight then
+		local mf = monitoredFight:duration()
+		local text = string.format("%.1d:%.2d:%.2d", mf/(60*60), mf/60%60, mf%60)
+		UI.MainForm.fightTimer:SetText(text)
 	end
 end
 
@@ -412,22 +461,27 @@ end
 ----------------------------------
 
 -- register if a player is inside a pvp match
-function DarkMeter:OnPVPMatchEntered()
-	self.playerInPvPMatch = true
+function DarkMeter:OnMatchEntered()
+	self:updateGroup()
+	self.playerInPvPMatch = DMUtils.playerInPvPMatch()
 end
 
 -- archives if the player leaves before the end of the match
-function DarkMeter:OnPVPMatchExited()
+function DarkMeter:OnMatchExited()
 	if self.playerInPvPMatch then
-		self.playerInPvPMatch = false
+		self.playerInPvPMatch = DMUtils.playerInPvPMatch()
 		DarkMeter:stopAllFights()
 	end
+	self:updateGroup()
 end
 
 -- ensure that the pvp match is archived correctly at the end of the fight
-function DarkMeter:OnPVPMatchFinished()
-	self.playerInPvPMatch = false
-	DarkMeter:stopAllFights()
+function DarkMeter:OnMatchFinished()
+	-- DarkMeter:stopAllFights()
+
+	-- what an ugly workaround, but some combat events gets processed AFTER the match has finished...
+	-- this will generate another fight lasting a fraction of a second, to prevent this I'll delay the stopallfights function
+	ApolloTimer.Create(0.3, false, "stopAllFights", self)
 end
 
 
@@ -580,16 +634,32 @@ end
 
 -- instantiate a new Fight instance to create the currentFight if necessary
 function DarkMeter:startCombatIfNecessary()
+	if DarkMeter.paused then return end
+
 	-- instantiate a new fight if out of combat
 	if not currentFight then
 		currentFight = Fight:new()
+		currentFight.forcedName = "Current fight"
+
 		-- set pvpMatch to true if necessary
-		-- I test directly against a MatchingGame:GetPVPMatchState()
-		if (self.playerInPvPMatch or MatchingGame:GetPVPMatchState() ~= nil) and self.settings.mergePvpFights then
+		-- I test directly against a DMUtils.playerInPvPMatch() in case the player has reloaded the ui after entering the pvp match
+		if (self.playerInPvPMatch or DMUtils.playerInPvPMatch() ) and self.settings.mergePvpFights then
 			currentFight.pvpMatch = true
+			-- force current fight's name to a generic "PVP match" with local time
+			local time = GameLib.GetLocalTime()
+			local matchName = "PvP Match (" .. time.nHour .. ":" .. time.nMinute .. ")"
+
+			-- try to set current fight's name to the specific match's type (es. "Arena (10:11)")
+			local matchType = MatchingGame:GetMatchingGameType()
+			for name, code in pairs(MatchingGame.MatchType) do
+				if code == matchType then
+					matchName = name .. " (" .. time.nHour .. ":" .. time.nMinute .. ")"
+				end
+			end
+
+			currentFight.forcedName = matchName
 		end
 
-		currentFight.forcedName = "Current fight"
 	elseif currentFight:paused() then
 		currentFight:continue()
 	end
@@ -599,6 +669,8 @@ function DarkMeter:startCombatIfNecessary()
 	elseif overallFight:paused() then
 		overallFight:continue()
 	end
+
+	self:startMonitoredFightTimer()
 end
 
 
@@ -611,29 +683,30 @@ end
 
 -- archive currentFight and sets it to nil
 function DarkMeter:stopAllFights()
-	currentFight:stop()
-	overallFight:stop()
-
-	-- if the player is in a pvp match and has chosen to treat the entire pvp match as an unique fight
-	-- opposite condition... need to check if the player is not in pvp or is in pvp but doesn't want to treat the match as an entire fight to reset the data
-	if not self.playerInPvPMatch or not self.settings.mergePvpFights then
-		if currentFight.pvpMatch then
-			local time = GameLib.GetLocalTime()
-			currentFight.forcedName = "PvP Match (" .. time.nHour .. ":" .. time.nMinute .. ")"
-			Print(currentFight.forcedName)
-		else
-			currentFight.forcedName = nil	
-		end
+	if overallFight ~= nil then
+		overallFight:stop()
+	end
+	if currentFight ~= nil then
+		currentFight:stop()
 		
-		-- check that the fight has at least a member to prevent inserting fights when nothing happens (a mob that aggro then evades without hitting)
-		if DMUtils.tableLength(currentFight.groupMembers) > 0 then
-			table.insert(fightsArchive, 1, DMUtils.cloneTable(currentFight))
+		-- if the player is in a pvp match and has chosen to treat the entire pvp match as an unique fight
+		-- opposite condition... need to check if the player is not in pvp or is in pvp but doesn't want to treat the match as an entire fight to reset the data
+		if not self.playerInPvPMatch or not self.settings.mergePvpFights then
+			if not currentFight.pvpMatch then
+				currentFight.forcedName = nil	
+			end
+			
+			-- check that the fight has at least a member to prevent inserting fights when nothing happens (a mob that aggro then evades without hitting)
+			if DMUtils.tableLength(currentFight.groupMembers) > 0 then
+				table.insert(fightsArchive, 1, DMUtils.cloneTable(currentFight))
+			end
+			currentFight = nil	
 		end
-		currentFight = nil	
 	end
 
 	-- after 0.6 sec call an updateUI to check if the interface needs an update
 	ApolloTimer.Create(0.6, false, "updateUI", DarkMeter)
+	DarkMeter:stopMonitoredFightTimer()
 end
 
 -- used to add dummy testing data to the archived fights
@@ -837,8 +910,16 @@ function DarkMeter:updateUI()
 	else
 		-- if the user is not inspecting a specific fight, show currentFight
 		if not self.specificFight then
+			-- if the current fight is nil there are two cases
 			if not currentFight then
-				UI.MainForm:clear()
+				-- 1) the fight has just ended and the form need an update because tha last one was few milliseconds before the end of the fight
+				-- in this case, refresh with the last archived fight
+				if #fightsArchive > 0 then
+					UI:showDataForFight(fightsArchive[1])
+				-- 2) the updateUI has been called with no fights at all
+				else
+					UI.MainForm:clear()
+				end
 			else
 				UI:showDataForFight(currentFight)
 			end
