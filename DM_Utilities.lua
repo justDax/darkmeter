@@ -82,21 +82,33 @@ function DMUtils:titleForStat(stat, short)
 	end
 end
 
-function DMUtils.formatNumber(num, places)
+function DMUtils.formatNumber(num, places, bShortFormat)
   local ret
-  local placeValue = ("%%.%df"):format(places or 0)
-  if not num then
-      return 0
-  elseif num >= 1000000000000 then
-      ret = placeValue:format(num / 1000000000000) .. " Tril" -- trillion
-  elseif num >= 1000000000 then
-      ret = placeValue:format(num / 1000000000) .. " Bil" -- billion
-  elseif num >= 1000000 then
-      ret = placeValue:format(num / 1000000) .. " Mil" -- million
-  elseif num >= 1000 then
-      ret = placeValue:format(num / 1000) .. "k" -- thousand
+  -- if the type of places is a boolean then places has not been specified and the default value is 0
+  if type(places) == "boolean" then
+    bShortFormat = places
+    places = 0
+  end
+  if bShortFormat == nil then bShortFormat = true end
+  if places == nil then places = 0 end
+
+  if bShortFormat then
+    local placeValue = ("%%.%df"):format(places)
+    if not num then
+        return 0
+    elseif num >= 1000000000000 then
+        ret = placeValue:format(num / 1000000000000) .. " Tril" -- trillion
+    elseif num >= 1000000000 then
+        ret = placeValue:format(num / 1000000000) .. " Bil" -- billion
+    elseif num >= 1000000 then
+        ret = placeValue:format(num / 1000000) .. " Mil" -- million
+    elseif num >= 1000 then
+        ret = placeValue:format(num / 1000) .. "k" -- thousand
+    else
+        ret = DMUtils.roundToNthDecimal(num, places) -- hundreds
+    end
   else
-      ret = DMUtils.roundToNthDecimal(num, (places or 0)) -- hundreds
+    ret = DMUtils.roundToNthDecimal(num, places) -- hundreds
   end
   return ret
 end

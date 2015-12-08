@@ -38,6 +38,14 @@ function SettingsForm:reinitUI()
   UI.MainForm:clear()
   UI.MainForm:initColumns()
   UI.MainForm:showGroupStats()
+
+  -- updates PlayerDetails if opened
+  if UI.PlayerDetails.visible then
+    local id = UI.PlayerDetails.unit.id
+    if UI.lastFight.groupMembers[id] then
+      UI.PlayerDetails:setPlayer(UI.lastFight.groupMembers[id])
+    end
+  end
 end
 
 
@@ -61,11 +69,29 @@ function SettingsForm.controls:OnShowRanks()
 end
 
 -- when enabled and inside a pvp match, the currentFight will last untill the match is over, even when going out of combat
-function SettingsForm.controls:MergePvPFights()
+function SettingsForm.controls:OnMergePvPFights()
   local btn = SettingsForm.buttons:FindChild("MergePvPFights")
   DarkMeter.settings.mergePvpFights = btn:IsChecked()
   DarkMeter:stopAllFightsIfNotInCombat()
   SettingsForm:reinitUI()
+end
+
+-- changes how damages are displayed: 4.3k => 4.300
+function SettingsForm.controls:OnShortNumberFormat()
+  local btn = SettingsForm.buttons:FindChild("ShortNumberFormat")
+  DarkMeter.settings.shortNumberFormat = btn:IsChecked()
+  SettingsForm:reinitUI()
+end
+
+-- changes the behavior of dots, if enabled they will be merged with the skill that generated them
+function SettingsForm.controls:OnMergeDots()
+  local btn = SettingsForm.buttons:FindChild("MergeDots")
+  DarkMeter.settings.mergeDots = btn:IsChecked()
+  SettingsForm:reinitUI()
+  -- go back if inspecting a skill as every skill should have been recalculated
+  while (#UI.PlayerDetails.prevWindows > 0) do
+    UI.PlayerDetails.controls:OnPrevWin()
+  end
 end
 
 
@@ -144,6 +170,8 @@ function SettingsForm:setValuesFromSettings()
   self.buttons:FindChild("ShowRanks"):SetCheck(DarkMeter.settings.showRanks)
   self.buttons:FindChild("ShowClassIcon"):SetCheck(DarkMeter.settings.showClassIcon)
   self.buttons:FindChild("MergePvPFights"):SetCheck(DarkMeter.settings.mergePvpFights)
+  self.buttons:FindChild("ShortNumberFormat"):SetCheck(DarkMeter.settings.shortNumberFormat)
+  self.buttons:FindChild("MergeDots"):SetCheck(DarkMeter.settings.mergeDots)
   self.buttons:FindChild("ResetFightBox"):FindChild("ResetFight" .. DarkMeter.settings.resetMapChange):SetCheck(true)
   self.rowHeightSlider:SetValue(DarkMeter.settings.rowHeight)
   self.rowHeightBox:SetText(DarkMeter.settings.rowHeight)

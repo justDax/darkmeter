@@ -59,10 +59,6 @@ function ReportForm:hide()
   end
 end
 
-function ReportForm:report(channel)
-
-end
-
 
 function ReportForm.controls:OnCancel()
   ReportForm:hide()
@@ -110,31 +106,35 @@ function ReportForm.report(channel)
   end
 
   local stats = DarkMeter.settings.selectedStats
-  local reportText = {}
 
-  reportText[1] = "DarkMeter - " .. DMUtils:titleForStat(stats[1], false) .. " - " .. UI.lastFight:name()
+  if stats[1] then
+    local reportText = {}
 
+    reportText[1] = "DarkMeter - " .. DMUtils:titleForStat(stats[1], false) .. " - " .. UI.lastFight:name()
+      
+    -- sort all group members by the main stat being monitored
+    local orderedUnits = UI.lastFight:orderMembersBy(stats[1])
     
-  -- sort all group members by the main stat being monitored
-  local orderedUnits = UI.lastFight:orderMembersBy(stats[1])
-  
-  local maxVal = 0
-  for i = 1, #orderedUnits do
-    maxVal = math.max(maxVal, orderedUnits[i][stats[1]](orderedUnits[i]) )
-  end
-
-  local rowsToReport = tonumber(ReportForm.maxRows:GetText())
-  for i = 1, #orderedUnits do
-    if i <= rowsToReport then
-      local options = UI.MainForm:formatRowOptions(orderedUnits[i], UI.lastFight, 1, maxVal)
-      reportText[i+1] = tostring(i) .. ") " .. options.name .. " - " .. options.text
+    local maxVal = 0
+    for i = 1, #orderedUnits do
+      maxVal = math.max(maxVal, orderedUnits[i][stats[1]](orderedUnits[i]) )
     end
-  end
 
-  ReportForm:hide()
+    local rowsToReport = tonumber(ReportForm.maxRows:GetText())
+    for i = 1, #orderedUnits do
+      if i <= rowsToReport then
+        local options = UI.MainForm:formatRowOptions(orderedUnits[i], UI.lastFight, 1, maxVal)
+        reportText[i+1] = tostring(i) .. ") " .. options.name .. " - " .. options.text
+      end
+    end
 
-  for i = 1, #reportText do
-    ChatSystemLib.Command("/" .. channel .. " " .. reportText[i])
+    ReportForm:hide()
+
+    for i = 1, #reportText do
+      ChatSystemLib.Command("/" .. channel .. " " .. reportText[i])
+    end
+  else
+    ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "You are not tracking any stat, to report, please select at least one.", "DarkMeter")
   end
 end
 

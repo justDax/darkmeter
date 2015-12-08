@@ -159,59 +159,65 @@ function MainForm:initColumns()
   local rowHeight = DarkMeter.settings.rowHeight
   local stats = DarkMeter.settings.selectedStats
   local rowsQt = 0 
-  if UI.lastFight then
+  if UI.lastFight and stats[1] then
     rowsQt = #UI.lastFight:orderMembersBy(stats[1])
-  end
-  if not stats then
-    Apollo.AddAddonErrorText(DarkMeter, "Cannot initialize columns, invalid value for stats variable.")
   end
 
   -- for each selected stats initialize a column
-  for i = 1, #stats do
-    if self.cols[i] == nil then
-      self.cols[i] = {}
+  if stats[1] then
+    MainForm.content:SetText("")
+
+    for i = 1, #stats do
+      if self.cols[i] == nil then
+        self.cols[i] = {}
+      end
+      -- sets the column with the right form template
+      if not self.cols[i].column then
+        self.cols[i].column = Apollo.LoadForm(UI.xmlDoc, "ColTemplate", MainForm.content, MainForm.controls)
+      end
+
+      local totalWidth = self.contentWidth
+      local mainColWidth = (totalWidth - (#stats -1) * UI.minColWidth )
+      local otherColsWidth = UI.minColWidth
+      local colWidth = i == 1 and mainColWidth or otherColsWidth
+
+      local left = i == 1 and 0 or (mainColWidth + (i - 2) * otherColsWidth )
+      local rowsHeight = ( (1 + rowHeight) * (rowsQt + 1) )
+      local colHeight = math.max(MainForm.wrapper:GetHeight(), rowsHeight)
+
+      if i == 1 then -- set container position only once
+        local x, y = MainForm.content:GetAnchorOffsets()
+        MainForm.content:SetAnchorOffsets(x, y, (x + MainForm.wrapper:GetWidth() - 13), (y + colHeight) )
+      end
+
+      local newLocation = WindowLocation.new({ fPoints = {0, 0, 0, 0}, nOffsets = {left, 0, (left + colWidth), colHeight} })
+
+
+      self.cols[i].column:MoveToLocation(newLocation)
+
+      -- save current col width
+      self.colWidth[i] = self.cols[i].column:GetWidth()
+      -- create column title
+      if self.cols[i].header then
+        self.cols[i].header.bar:Destroy()
+        self.cols[i].header = nil
+      end
+      self.cols[i].header = UI.Row:new(self.cols[i].column, 1)
+      
+      -- update title with the correct infos
+      MainForm.cols[i].header:update({
+        icon = false,
+        title = i == 1 and "Name" or false,
+        background = false,
+        text = i == 1 and DMUtils:titleForStat(stats[i]) or DMUtils:titleForStat(stats[i], true),
+        width = self.colWidth[i]
+      })
     end
-    -- sets the column with the right form template
-    if not self.cols[i].column then
-      self.cols[i].column = Apollo.LoadForm(UI.xmlDoc, "ColTemplate", MainForm.content, MainForm.controls)
-    end
-
-    local totalWidth = self.contentWidth
-    local mainColWidth = (totalWidth - (#stats -1) * UI.minColWidth )
-    local otherColsWidth = UI.minColWidth
-    local colWidth = i == 1 and mainColWidth or otherColsWidth
-
-    local left = i == 1 and 0 or (mainColWidth + (i - 2) * otherColsWidth )
-    local rowsHeight = ( (1 + rowHeight) * (rowsQt + 1) )
-    local colHeight = math.max(MainForm.wrapper:GetHeight(), rowsHeight)
-
-    if i == 1 then -- set container position only once
-      local x, y = MainForm.content:GetAnchorOffsets()
-      MainForm.content:SetAnchorOffsets(x, y, (x + MainForm.wrapper:GetWidth() - 13), (y + colHeight) )
-    end
-
-    local newLocation = WindowLocation.new({ fPoints = {0, 0, 0, 0}, nOffsets = {left, 0, (left + colWidth), colHeight} })
-
-
-    self.cols[i].column:MoveToLocation(newLocation)
-
-    -- save current col width
-    self.colWidth[i] = self.cols[i].column:GetWidth()
-    -- create column title
-    if self.cols[i].header then
-      self.cols[i].header.bar:Destroy()
-      self.cols[i].header = nil
-    end
-    self.cols[i].header = UI.Row:new(self.cols[i].column, 1)
-    
-    -- update title with the correct infos
-    MainForm.cols[i].header:update({
-      icon = false,
-      title = i == 1 and "Name" or false,
-      background = false,
-      text = i == 1 and DMUtils:titleForStat(stats[i]) or DMUtils:titleForStat(stats[i], true),
-      width = self.colWidth[i]
-    })
+  else
+    local colHeight = MainForm.wrapper:GetHeight()
+    local x, y = MainForm.content:GetAnchorOffsets()
+    MainForm.content:SetAnchorOffsets(x, y, (x + MainForm.wrapper:GetWidth() - 13), (y + colHeight) )
+    MainForm.content:SetText("No Stats Selected")
   end
     
   -- delete no longer needed columns
@@ -282,7 +288,7 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
     local value = unit[stats[i]](unit)
     
     -- sets bar text
-    local num = DMUtils.formatNumber( value, 1 )
+    local num = DMUtils.formatNumber( value, 1 , DarkMeter.settings.shortNumberFormat )
     if column == 1 and value > 0 then
       local percent = DMUtils.roundToNthDecimal( value / tempFight[stats[i]](tempFight) * 100, 1 )
       options.text = num .. " (" .. percent .. "%)"
@@ -340,9 +346,10 @@ end
 
 -- used to display the selected stats of the lastFight
 function MainForm:showGroupStats()
-  if UI.lastFight then
-    local stats = DarkMeter.settings.selectedStats
+  local stats = DarkMeter.settings.selectedStats
 
+  if UI.lastFight and stats[1] then
+    
     -- sort all group members by the main stat being monitored
     local orderedUnits = UI.lastFight:orderMembersBy(stats[1])
     -- local maxVal = orderedUnits[1][stats[1]](orderedUnits[1]) -- the first (highest) value of the stats passes, used to calculate bar width for others party members

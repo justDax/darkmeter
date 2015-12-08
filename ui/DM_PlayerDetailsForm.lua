@@ -3,6 +3,7 @@ local PlayerDetails = {}            -- prompt reset data form and all the correl
 PlayerDetails.controls = {}         -- form controls
 PlayerDetails.graphControls = {}    -- controls grid drawing functions
 PlayerDetails.botControls = {}      -- controls the bottom container part
+PlayerDetails.graphBars = {}        -- array with all the bars shown inside the graph
 local UI
 local DarkMeter
 local DMUtils
@@ -16,7 +17,7 @@ function PlayerDetails:init(xmlDoc)
 
   if xmlDoc ~= nil and xmlDoc:IsLoaded() then
     PlayerDetails.form = Apollo.LoadForm(xmlDoc, "PlayerDetailsForm", nil, PlayerDetails.controls)
-    
+
     -- some useful form child windows
     PlayerDetails.dropdown = PlayerDetails.form:FindChild("Dropdown")
     PlayerDetails.content = PlayerDetails.form:FindChild("Content")
@@ -112,9 +113,11 @@ function PlayerDetails:updateForm()
       end
     end
     
-    if self.stat ~= "deaths" then
+    if self.stat ~= "deaths" and self.stat ~= "damageTaken" then
       PlayerDetails.graphControls:createYLabels(data)
       PlayerDetails.graphControls:createBars(unitSkills)
+    else
+      PlayerDetails.graphControls:clearBars()
     end
 
     -- set overall infos
@@ -271,10 +274,25 @@ PlayerDetails.graphControls.botAbundance = 25
 PlayerDetails.graphControls.distanceBetweenBars = 5
 PlayerDetails.graphControls.maxBarWidth = 30
 
+-- clear axes, grid, and icons
 function PlayerDetails.graphControls:clear()
   PlayerDetails.graph:DestroyAllPixies()
   PlayerDetails.graphControls.maxValue = 0
 end
+
+-- clear bars
+function PlayerDetails.graphControls:clearBars()
+  for i = 1, #PlayerDetails.graphBars do
+    PlayerDetails.graphBars[i]:Destroy()
+    PlayerDetails.graphBars[i] = nil
+  end
+end
+
+-- fired when clicking on a single bar
+function PlayerDetails.graphControls:InspectSingleSkill(wndH, wndC, eBtn, nX, nY)
+  PlayerDetails.botControls:InspectSingleSkill(wndH, wndC, eBtn, nX, nY)
+end
+
 
 function PlayerDetails.graphControls:createAxes()
   local opts = {
@@ -378,62 +396,102 @@ function PlayerDetails.graphControls:createBars(unitSkills)
         end
         
         local barHeight =  graphHeight * skillValue / PlayerDetails.graphControls.maxValue
-        PlayerDetails.graphControls:createBar( barWidth, barHeight, counter )
-        PlayerDetails.graphControls:createBarIcon( barWidth, counter, skill )
+        if PlayerDetails.graphBars[counter] ~= nil then
+          PlayerDetails.graphControls:createOrUpdateBar( barWidth, barHeight, counter, skill, PlayerDetails.graphBars[counter] )
+        else
+          PlayerDetails.graphBars[counter] = PlayerDetails.graphControls:createOrUpdateBar( barWidth, barHeight, counter, skill )
+        end
       end
     end
+
+    -- destroy bars in excess
+    if #PlayerDetails.graphBars > counter then
+      for i = (counter + 1), #PlayerDetails.graphBars do
+        PlayerDetails.graphBars[i]:Destroy()
+        PlayerDetails.graphBars[i] = nil
+      end
+    end
+
+  else
+    PlayerDetails.graphControls.clearBars()
   end
 
 end
 
 -- creates a single graph bar
-function PlayerDetails.graphControls:createBar( width, height, i)
+function PlayerDetails.graphControls:createOrUpdateBar( width, height, i, data, wndBar)
   if PlayerDetails.graphControls.maxValue and PlayerDetails.graphControls.maxValue > 0 then
     local left = PlayerDetails.graphControls.leftAbundance + 10 + PlayerDetails.graphControls.distanceBetweenBars + ( (width + PlayerDetails.graphControls.distanceBetweenBars) * (i - 1) )
     if (width > PlayerDetails.graphControls.maxBarWidth) then
       width = PlayerDetails.graphControls.maxBarWidth
     end
-
+    
     local color = ApolloColor.new("ff404653")
     if DMUtils.classes[PlayerDetails.unit.classId] then
       local bg = DMUtils.classes[PlayerDetails.unit.classId].color
       color = ApolloColor.new(bg[1], bg[2], bg[3], 0.8)
     end
 
-    local opts = {
-      strSprite = "BasicSprites:WhiteFill",
-      cr = color,
-      loc = {
-        fPoints = {0, 1, 0, 1},
-        nOffsets = {left, (-PlayerDetails.graphControls.botAbundance - height), (left + width), -PlayerDetails.graphControls.botAbundance}
-      }
-    }
-    PlayerDetails.graph:AddPixie(opts)
-  end
-end
-
--- creates the skill icon below a single bar
-function PlayerDetails.graphControls:createBarIcon(width, i, skill)
-  if skill.name then
-    local left = PlayerDetails.graphControls.leftAbundance + 10 + PlayerDetails.graphControls.distanceBetweenBars + ( (width + PlayerDetails.graphControls.distanceBetweenBars) * (i - 1) )
-    local iconSize = 20
-    if iconSize > width then
-      iconSize = width
-    else
-      local w = width > PlayerDetails.graphControls.maxBarWidth and PlayerDetails.graphControls.maxBarWidth or width
-      left = left + (w - iconSize) / 2
+    if wndBar == nil then
+      wndBar = Apollo.LoadForm(PlayerDetails.xmlDoc, "PlayerDetailsGraphBar", PlayerDetails.graph, PlayerDetails.graphControls)
     end
+    -- sets the entire bar container position
+    local wndLocation = WindowLocation.new({
+      fPoints = {0, 0, 0, 1},
+      nOffsets = {left, 0, (left + width), 0}
+    })
+    wndBar:MoveToLocation( wndLocation )
 
-    local opts = {
-      strSprite = skill.icon,
-      loc = {
-        fPoints = {0, 1, 0, 1},
-        nOffsets = {left, -iconSize, (left + iconSize), 0}
-      }
-    }
-    PlayerDetails.graph:AddPixie(opts)
+    -- sets the effective visible bar
+    local loc = WindowLocation.new({
+      fPoints = {0, 1, 1, 1},
+      nOffsets = {0, (-PlayerDetails.graphControls.botAbundance - height), 0, -PlayerDetails.graphControls.botAbundance}
+    })
+    local bar = wndBar:FindChild("Bar")
+    bar:MoveToLocation( loc )
+    bar:SetBGColor(color)
+
+    if data ~= false then
+      local stat = data.name .. ": " .. DMUtils.formatNumber(data:dataFor(PlayerDetails.stat), 2, DarkMeter.settings.shortNumberFormat)
+      local icon = wndBar:FindChild("Icon")
+
+      bar:SetTooltip(stat)
+      icon:SetTooltip(stat)
+
+      --- don't set data for interrupts, nothing to inspect for cc stats...
+      if PlayerDetails.stat ~= "interrupts" then
+        icon:SetData(data)
+        bar:SetData(data)
+      else
+        icon:SetData(nil)
+        bar:SetData(nil)
+      end
+
+      -- create icon
+      if data.icon then
+        icon:SetSprite(data.icon)
+
+        local iconSize = 20
+        local iconLeft = 0
+        if iconSize > width then
+          iconSize = width
+        else
+          local w = width > PlayerDetails.graphControls.maxBarWidth and PlayerDetails.graphControls.maxBarWidth or width
+          iconLeft = (w - iconSize) / 2
+        end
+        local loc = WindowLocation.new({
+          fPoints = {0, 1, 0, 1},
+          nOffsets = {iconLeft, -iconSize, (iconLeft + iconSize), 0}
+        })
+        icon:MoveToLocation(loc)
+      else
+        icon:SetSprite("")
+      end
+    end
+    return wndBar
   end
 end
+
 
 
 
@@ -475,7 +533,7 @@ function PlayerDetails.botControls:updateBottomPart(unitSkills)
 
       percentage = DMUtils.roundToNthDecimal( (skillValue / totalStat * 100), 1) .. "%"
       name = skill.name
-      value = DMUtils.formatNumber(skillValue, 2)
+      value = DMUtils.formatNumber(skillValue, 2, DarkMeter.settings.shortNumberFormat)
     end
     PlayerDetails.botControls:updateSingleSkill(PlayerDetails.botControls.firstRows[index], percentage, name, value, dataToBind)
   end
@@ -619,7 +677,7 @@ function PlayerDetails.botControls:showDamgeDoneBy(name)
       
       local percentage = DMUtils.roundToNthDecimal( (skill.damageDone / totalStat * 100), 1) .. "%"
       local name = skill.name
-      local value = DMUtils.formatNumber(skill.damageDone, 2)
+      local value = DMUtils.formatNumber(skill.damageDone, 2, DarkMeter.settings.shortNumberFormat)
       local dataToBind = skill
       PlayerDetails.botControls:updateSingleSkill(PlayerDetails.botControls.thirdRows[index], percentage, name, value, dataToBind)
     end
@@ -755,7 +813,7 @@ function PlayerDetails.botControls:showDetailsForRow(data)
         if not value then
           value = "-"
         else
-          value = DMUtils.formatNumber( value, 2)
+          value = DMUtils.formatNumber( value, 2, DarkMeter.settings.shortNumberFormat)
         end
         col:FindChild(wndName):SetText( value )
       end      

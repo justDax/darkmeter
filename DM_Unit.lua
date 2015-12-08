@@ -30,6 +30,7 @@ function Unit:new(wsUnit)
   unit.deathCount = 0
   unit.deathsRecap = {}                  -- array of tables, each table is like {timestamp = {GameLib.GetLocalTime()}, skills = array with the lasdt 10 skills taken}
   unit.totalFightTime = 0
+  unit.lastActionTimestamp = nil        -- timestamp of the last action, used to calc dps
   unit.pets = {}            -- table:  key = pet name, value = Unit instance
   unit.lastTenDamagingSkillsTaken = {} -- array of skills stored as formattedSkill NOT as a skill instance! used for death recap
 
@@ -52,6 +53,7 @@ function Unit:startFight()
   if self.startTime == nil then
     self.startTime = GameLib.GetGameTime()
     self.stopTime = nil
+    self.lastActionTimestamp = nil
     for name, unit in pairs(self.pets) do
       unit:startFight()
     end
@@ -61,20 +63,23 @@ end
 function Unit:stopFight()
   if self.stopTime == nil and self.startTime ~= nil then
     self.stopTime = GameLib.GetGameTime()
-    self.totalFightTime = self.totalFightTime + (self.stopTime - self.startTime)
+    self.totalFightTime = self.totalFightTime + ( (self.lastActionTimestamp or self.stopTime) - self.startTime)
     for name, unit in pairs(self.pets) do
       unit:stopFight()
     end
     self.startTime = nil
+    self.lastActionTimestamp = nil
   end
 end
 
 function Unit:fightDuration()
-  if self.startTime then
+  if self.startTime or self.totalFightTime > 0 then
     if self.stopTime then
       return math.floor(self.totalFightTime)
+    elseif self.startTime then
+      return math.floor(self.totalFightTime + ( (self.lastActionTimestamp or GameLib.GetGameTime()) - self.startTime) )
     else
-      return math.floor(self.totalFightTime + (GameLib.GetGameTime() - self.startTime) )
+      return 0
     end
   else
     return 0
@@ -103,6 +108,7 @@ function Unit:addSkill(skill)
       self.skills[skill.name] = Skill:new()
     end
     self.skills[skill.name]:add(skill)
+    self.lastActionTimestamp = GameLib.GetGameTime()
   end
 end
 
@@ -111,7 +117,7 @@ end
 function Unit:addSkillTaken(skill)
   -- process damage taken
   if skill.typology == "damage" then
-    local name = skill.fallingDamage and "Gravity" or skill.casterName
+    local name = skill.fallingDamage == true and "Gravity" or skill.casterName
     
     if not self.damagingSkillsTaken[name] then
       self.damagingSkillsTaken[name] = {}
@@ -120,7 +126,6 @@ function Unit:addSkillTaken(skill)
       self.damagingSkillsTaken[name][skill.name] = Skill:new()
     end
     self.damagingSkillsTaken[name][skill.name]:add(skill)
-    
     -- add to the last 10 damage taken
     table.insert(self.lastTenDamagingSkillsTaken, 1, skill)
     self.lastTenDamagingSkillsTaken[11] = nil
@@ -143,6 +148,7 @@ function Unit:addSkillTaken(skill)
     -- TODO process healing taken
     -- this might be a future trackable stat, I don't think is very useful for now
   end
+  self.lastActionTimestamp = GameLib.GetGameTime()
 end
 
 
@@ -212,7 +218,9 @@ for i = 1, #stats do
       return a[stats[i]] > b[stats[i]]
     end
 
-    for k, skill in pairs(unit.skills) do
+    local skills = DarkMeter.settings.mergeDots and unit:mergedSkills() or unit.skills
+
+    for k, skill in pairs(skills) do
       local amount = skill[stats[i]]
       if amount > 0 then
         table.insert(tmp, skill)
@@ -281,6 +289,39 @@ function Unit:damageTakenOrderedByEnemies()
   end
   return tmp
 end
+
+
+------------------------------------------
+--   end skill order
+------------------------------------------
+
+
+function Unit:mergedSkills()
+  local tmpSkills = {}
+  for name, skill in pairs(self.skills) do
+    -- if the skill is the dot
+    if skill.originalName ~= nil then
+      if tmpSkills[skill.originalName] == nil then
+        tmpSkills[skill.originalName] = DMUtils.cloneTable(skill)
+      else
+        tmpSkills[skill.originalName]:merge(skill)
+      end
+    else
+      -- if the skill is the base spell
+      if tmpSkills[name] == nil then
+        tmpSkills[name] = DMUtils.cloneTable(skill)
+      else
+        local clone = DMUtils.cloneTable(skill)
+        clone:merge(tmpSkills[name])
+        tmpSkills[name] = clone
+      end
+    end  
+  end
+
+  return tmpSkills
+end
+
+
 
 
 -- returns integer percentage of crit, multihit, deflects...

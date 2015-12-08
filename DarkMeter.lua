@@ -2,13 +2,13 @@
 -- DarkMeter
 -----------------------------------------------------------------------------------------------
  
--- This addons use a custom class called Unit, which is a "wrapper" of the Unit class coming from the API
+-- This addon uses a custom class called Unit, which is a "wrapper" of the Unit class coming from the API
 -- variables called "unit" are usually instances of the cusom Unit class, while the Unit coming from the API is usually called "wsUnit" (wildstar unit)
 
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.4.4"
+DarkMeter.version = "0.4.5"
 
 
 
@@ -51,7 +51,11 @@ DarkMeter.availableStats = {
 }
 
 -- defaults settings, this table is overwritten on logins and stored on logouts
-DarkMeter.settings = {
+DarkMeter.defaults = {
+	mainFormLocation = WindowLocation.new({
+		fPoints = {0, 0, 0, 0},
+    nOffsets = {200, 300, 600, 600}
+	}),
 	overall = true,
 	mergePets = true,
 	showRanks = true,
@@ -63,8 +67,16 @@ DarkMeter.settings = {
 	reportRows = 5,								-- number of rows reported in chat
 	resetMapChange = 2,						-- integer value, can be: 1 (always), 2 (ask), 3 (never)
 	rowHeight = 26,								-- mainform row height (from 20 to 50)
-	mergePvpFights = true					-- if enebled and inside a pvp match, the currentFight will last untill the match is over, even when going out of combat
+	mergePvpFights = true,				-- if enabled and inside a pvp match, the currentFight will last untill the match is over, even when going out of combat
+	shortNumberFormat = true, 		-- if enabled, the number will be shown as 1.2Mil instead of 1.200,000
+	mergeDots = false							-- if true, all the skills that create a dot effect will be merged with the dot damage part, this means that the number of attacks will also count each dot tick
 }
+DarkMeter.settings = {}
+
+
+for k, v in pairs(DarkMeter.defaults) do
+	DarkMeter.settings[k] = v
+end
 
 
 -- list containing all events to register/unregister
@@ -134,8 +146,8 @@ function DarkMeter:OnDocLoaded()
 
 
 	-- slash commands
-	Apollo.RegisterSlashCommand("dm", "toggle", self)
-	Apollo.RegisterSlashCommand("darkmeter", "toggle", self)
+	Apollo.RegisterSlashCommand("dm", "slashHandler", self)
+	Apollo.RegisterSlashCommand("darkmeter", "slashHandler", self)
 	
 	-- asks it the user wants to reset the data on world change
 	Apollo.RegisterEventHandler("ChangeWorld", "promptResetData", UI)
@@ -196,6 +208,8 @@ end
 -- Functions
 -----------------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------------
+
+
 
 
 function DarkMeter:checkCombatLogOthers()
@@ -273,6 +287,46 @@ function DarkMeter:removeTracked(name)
 			break
 		end
 	end
+end
+
+
+
+
+----------------------------------
+-- slash commands
+----------------------------------
+
+function DarkMeter:slashHandler(cmd, arg)
+	if DarkMeter.slashCommands[arg] ~= nil then
+		DarkMeter.slashCommands[arg](self)
+	else
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "List of available commands:", "DarkMeter")
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "-----------------------------", "DarkMeter")
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "toggle (shows or hides the main window)", "DarkMeter")
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "restore (restore defaults settings)", "DarkMeter")
+	end
+end
+
+DarkMeter.slashCommands = {}
+
+function DarkMeter.slashCommands:toggle()
+	self:toggle()
+end
+
+function DarkMeter.slashCommands:restore()
+	self.settings = self.defaults
+
+	-- hides every other window
+	UI.PlayerDetails:hide()
+	UI.ReportForm:hide()
+	UI.ResetForm:hide()
+	UI.SelectFight:hide()
+	UI.SettingsForm:hide()
+
+	UI.MainForm.form:MoveToLocation(self.settings.mainFormLocation)
+	UI.MainForm:initColumns()
+	UI.MainForm:showGroupStats()
+	UI.MainForm.wrapper:RecalculateContentExtents()
 end
 
 
@@ -513,8 +567,8 @@ end
 function CombatUtils:formatCombatAction(e, customValues)
 	-- list of last 10 processed combat events, for development
 	table.insert(CombatUtils.Events, 1, e)
-	CombatUtils.Events[11] = nil
-		if _G.DarkMeter.Development then
+	-- CombatUtils.Events[11] = nil
+	if _G.DarkMeter.Development then
 		SendVarToRover("CapturedEvents", CombatUtils.Events)
 		SendVarToRover("lastLogEvent", e)
 	end
@@ -537,7 +591,8 @@ function CombatUtils:formatCombatAction(e, customValues)
 		overheal = (e.nOverheal or 0),
 		owner = e.unitCasterOwner,
 		targetkilled = e.bTargetKilled,
-		selfDamage = false
+		selfDamage = false,
+		dot = e.bPeriodic
 	}
 
 	-- add info about the caster
@@ -557,7 +612,11 @@ function CombatUtils:formatCombatAction(e, customValues)
 	-- add info on the spell itself
 	if e.splCallingSpell then
 		event.spell = e.splCallingSpell
-		event.name = e.splCallingSpell:GetName()
+		if event.dot then
+			event.name = e.splCallingSpell:GetName() .. " (dot)"
+		else
+			event.name = e.splCallingSpell:GetName()
+		end
 	end
 
 	-- add pet info
@@ -570,13 +629,13 @@ function CombatUtils:formatCombatAction(e, customValues)
 	setmetatable(customValues, event)
 	
 	-- checks if the skill is a self damaging skill
-	if customValues.target and customValues.caster and customValues.targetId == customValues.casterId then
+	if customValues.typology == "damage" and customValues.target and customValues.caster and customValues.targetId == customValues.casterId then
 		customValues.selfDamage = true
 	end
 
 	if _G.DarkMeter.Development then
 		table.insert(CombatUtils.formattedSkills, 1, customValues)
-		CombatUtils.formattedSkills[11] = nil
+		-- CombatUtils.formattedSkills[11] = nil
 		SendVarToRover("formattedSkill", customValues)
 		SendVarToRover("10formattedSkills", CombatUtils.formattedSkills)
 	end
@@ -675,11 +734,14 @@ function CombatUtils:processFormattedSkill(skill)
 	-- TODO skill.targetKilled will probably add the skill and unit only to the overall fight
 	-- as the currentFight should already be archived
 	if Group:inCombat() or skill.targetkilled then			-- usually the combat ends before the last damage gets processed
-		CombatUtils:addUnitsToFight(skill)								-- adds this unit to the currentFight if not already added
-		CombatUtils:addSkillToUnit(skill)									-- adds the casted skill to the caster
-		CombatUtils:updateCurrentFight()
-		UI.needsUpdate = true
-		DarkMeter:updateUI()
+		-- process the skill only if the a group member or a group member's pet is involved
+		if Group.members[skill.casterId] ~= nil or ( skill.ownerId ~= nil and Group.members[skill.ownerId] ~= nil ) or (skill.targetId ~= nil and Group.members[skill.targetId] ~= nil) then
+			CombatUtils:addUnitsToFight(skill)								-- adds this unit to the currentFight if not already added
+			CombatUtils:addSkillToUnit(skill)									-- adds the casted skill to the caster
+			CombatUtils:updateCurrentFight()
+			UI.needsUpdate = true
+			DarkMeter:updateUI()			
+		end
 	end
 end
 
@@ -893,7 +955,8 @@ function DarkMeter:OnCombatLogMultiHitShields(e)
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
 		multihit = true,
-		typology = "damage"  -- force all multihits with the same code as a damaging spell
+		typology = "damage",
+		damage = e.nShield,		-- for this event, the damages, being completely absorbed, are equal to the shield drained
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -920,7 +983,8 @@ function DarkMeter:OnCombatLogDamageShields(e)
 		Print("DAMEIG! Absorbed!")
 	end
 	local skill = CombatUtils:formatCombatAction(e, {
-		typology = "damage"
+		typology = "damage",
+		damage = e.nShield,		-- for this event, the damages, being completely absorbed, are equal to the shield drained
 	})
 	CombatUtils:processFormattedSkill(skill)
 end
@@ -950,9 +1014,7 @@ end
 -----------------------------------------------------------------------------------------------
 
 function DarkMeter:updateUI()
-	-- this function gets called from other modules, I need to set needsupdate here also
-	UI.needsUpdate = true
-	
+
 	-- updates MainForm
 	if self.settings.overall then
 		-- show overall data
@@ -978,14 +1040,6 @@ function DarkMeter:updateUI()
 		-- show specific fight
 		else
 			UI:showDataForFight(self.specificFight)
-		end
-	end
-
-	-- updates PlayerDetails if opened
-	if UI.PlayerDetails.visible then
-		local id = UI.PlayerDetails.unit.id
-		if UI.lastFight.groupMembers[id] then
-			UI.PlayerDetails:setPlayer(UI.lastFight.groupMembers[id])
 		end
 	end
 end

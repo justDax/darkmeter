@@ -104,6 +104,7 @@ end
 
 -- common function that will update the ui with the new selected fight
 function SelectFight:commonUIUpdate()
+  UI.needsUpdate = true
   DarkMeter:updateUI()
   UI.MainForm:setTracked()
   SelectFight:hide()

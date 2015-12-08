@@ -24,7 +24,6 @@ function Skill:new()
       multihits = {},
       multicrits = {}
     },
-    cc = {},
     -- quick reference values
     damageDone = 0,
     healingDone = 0,
@@ -49,9 +48,18 @@ function Skill:add(formattedSkill)
     self.ownerName = formattedSkill.ownerName
   end
 
+    -- set if skill is a dot
+  if self.dot == nil then
+    self.dot = formattedSkill.dot
+    -- if the skill is a dot, also set the normal skill name
+    if self.dot then
+      self.originalName = string.gsub(self.name, " %(dot%)", "")
+    end
+  end
+
   -- add skill icon
   if (self.icon == nil or self.icon == "") then
-    local icon = DMUtils:GetSpellIconByName(self.name)
+    local icon = DMUtils:GetSpellIconByName(self.originalName or self.name)
 
     if (icon == nil or icon == "") and formattedSkill.spell then
       icon = formattedSkill.spell:GetIcon()
@@ -61,7 +69,7 @@ function Skill:add(formattedSkill)
   end
 
   -- damage skill
-  if formattedSkill.typology == "damage"and not formattedSkill.selfDamage then
+  if formattedSkill.typology == "damage"and not formattedSkill.fallingDamage then
     self:ProcessDamage(formattedSkill)
   -- healing skill
   elseif formattedSkill.typology == "healing" then
@@ -73,6 +81,26 @@ function Skill:add(formattedSkill)
   elseif formattedSkill.fallingDamage then
     self:ProcessFallingDamage(formattedSkill)
   end
+end
+
+-- ATTENTION this function is critical, any changed to the skill class may break the merge funct
+-- merge two skills data together (used to merge a skill with its separate dot skill's data)
+function Skill:merge(skill)
+  for _, typology in pairs({"damage", "heals"}) do
+    for stat, val in pairs(self[typology]) do
+      if type(val) == "number" then
+        self[typology][stat] = self[typology][stat] + skill[typology][stat]
+      elseif type(val) == "table" then
+        self[typology][stat] = DMUtils.sumLists(val, skill[typology][stat])
+      end
+    end
+  end
+
+    -- quick reference values
+  self.damageDone = self.damageDone + skill.damageDone
+  self.healingDone = self.healingDone + skill.healingDone
+  self.overhealDone = self.overhealDone + skill.overhealDone
+  self.interrupts = self.interrupts + skill.interrupts
 end
 
 
@@ -139,12 +167,6 @@ end
 
 
 function Skill:ProcessCC(skill)
-  -- no need to archive an entire cc skill.. let's just increment the interrupts
-
-  -- if skill.state == GameLib.CodeEnumCombatResult.Hit then
-  --   table.insert(self.cc, skill)
-  -- end
-
   self.interrupts = self.interrupts + skill.interrupts
 end
 
