@@ -584,7 +584,7 @@ function CombatUtils:formatCombatAction(e, customValues)
 	-- initialize common useful values
 	local event = {
 		state = e.eCombatResult,
-		multihit = false,
+		multihit = (e.bMultiHit or false),
 		damage = (e.nDamageAmount or 0) + (e.nAbsorption or 0) + (e.nShield or 0),
 		typology = "undefined",
 		heal = (e.nHealAmount or 0),
