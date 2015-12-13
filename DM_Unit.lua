@@ -171,14 +171,14 @@ function Unit:damageTaken()
 end
 
 
-local stats = {"damageDone", "healingDone", "overhealDone", "interrupts"}
+local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "rawhealDone"}
 
 -- define functions to return the stats in this array, since they share the same logic
 for i = 1, #stats do
   Unit[stats[i]] = function(unit)
     local total = 0
     for k, skill in pairs(unit.skills) do
-      total = total + skill[stats[i]]
+      total = total + skill:dataFor(stats[i])
     end
     if DarkMeter.settings.mergePets then
       for n, pet in pairs(unit.pets) do
@@ -215,13 +215,13 @@ for i = 1, #stats do
     local tmp = {}
 
     local function sortFunct(a, b)
-      return a[stats[i]] > b[stats[i]]
+      return a:dataFor(stats[i]) > b:dataFor(stats[i])
     end
 
     local skills = DarkMeter.settings.mergeDots and unit:mergedSkills() or unit.skills
 
     for k, skill in pairs(skills) do
-      local amount = skill[stats[i]]
+      local amount = skill:dataFor(stats[i])
       if amount > 0 then
         table.insert(tmp, skill)
       end
@@ -231,7 +231,7 @@ for i = 1, #stats do
     if DarkMeter.settings.mergePets then
       for n, pet in pairs(unit.pets) do
         for k, skill in pairs(pet.skills) do
-          local amount = skill[stats[i]]
+          local amount = skill:dataFor(stats[i])
           if amount > 0 then
             table.insert(tmp, skill)
           end

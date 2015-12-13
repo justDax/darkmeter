@@ -40,11 +40,13 @@ function MainForm:init(xmlDoc)
   -- footer parts
   self.resumeBtn = MainForm.footer:FindChild("Resume")
   self.pauseBtn = MainForm.footer:FindChild("Pause")
+  self.captureBtn = MainForm.footer:FindChild("CaptureMode")
   self.fightDuration = self.footer:FindChild("FightDuration")
   self.fightTimer = self.fightDuration:FindChild("Timer")
 
   MainForm:initColumns()
   self:setTracked()
+  self:setCaptureBtn()
   UI:show()
 end
 
@@ -142,6 +144,23 @@ function MainForm.controls:OnResume()
   DarkMeter:resume()
   MainForm.pauseBtn:Show(true)
   MainForm.resumeBtn:Show(false)
+end
+
+
+-- changes mode between always / in combat
+function MainForm.controls:OnCaptureModeChange()
+  DarkMeter.settings.alwaysCapture = not DarkMeter.settings.alwaysCapture
+  MainForm:setCaptureBtn()
+end
+
+function MainForm:setCaptureBtn()
+  if DarkMeter.settings.alwaysCapture then
+    self.captureBtn:SetText("ALWAYS")
+    DarkMeter:startCombatIfNecessary()
+  else
+    self.captureBtn:SetText("COMBAT")
+    DarkMeter:stopAllFightsIfNotInCombat()
+  end
 end
 
 

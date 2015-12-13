@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.4.5"
+DarkMeter.version = "0.5.0"
 
 
 
@@ -42,6 +42,7 @@ DarkMeter.playerInPvPMatch =	false				-- true if player enters a pvp match, like
 -- list of the stats the user can monitor
 DarkMeter.availableStats = {
 	"damageDone",
+	"rawhealDone",
 	"overhealDone",
 	"healingDone",
 	"interrupts",
@@ -67,9 +68,11 @@ DarkMeter.defaults = {
 	reportRows = 5,								-- number of rows reported in chat
 	resetMapChange = 2,						-- integer value, can be: 1 (always), 2 (ask), 3 (never)
 	rowHeight = 26,								-- mainform row height (from 20 to 50)
+	bgOpacity = 90,								-- main window backround opacity
 	mergePvpFights = true,				-- if enabled and inside a pvp match, the currentFight will last untill the match is over, even when going out of combat
 	shortNumberFormat = true, 		-- if enabled, the number will be shown as 1.2Mil instead of 1.200,000
-	mergeDots = false							-- if true, all the skills that create a dot effect will be merged with the dot damage part, this means that the number of attacks will also count each dot tick
+	mergeDots = false,						-- if true, all the skills that create a dot effect will be merged with the dot damage part, this means that the number of attacks will also count each dot tick
+	alwaysCapture = false
 }
 DarkMeter.settings = {}
 
@@ -348,7 +351,7 @@ function DarkMeter:pause()
 	for _, fight in pairs({currentFight, overallFight}) do
 		fight:stop()
 	end
-
+	DarkMeter:stopMonitoredFightTimer()
 	DarkMeter.paused = true
 end
 
@@ -357,13 +360,11 @@ function DarkMeter:resume()
 		Apollo.RegisterEventHandler(combatLogEvents[i], "On" .. combatLogEvents[i], DarkMeter)
 	end
 	Apollo.StartTimer("MainFormRefresher")
-
+	DarkMeter.paused = false
 	-- resume the fight if the group is in combat
-	if Group:inCombat() then
+	if Group:inCombat() or DarkMeter.settings.alwaysCapture then
 		self:startCombatIfNecessary()
 	end
-
-	DarkMeter.paused = false
 end
 
 function DarkMeter:toggle()
@@ -383,7 +384,7 @@ function DarkMeter:resetData()
 	fightsArchive = {}
 	currentFight = nil
 	overallFight = nil
-	if Group:inCombat() then
+	if Group:inCombat() or DarkMeter.settings.alwaysCapture then
 		DarkMeter:startCombatIfNecessary()
 	end
 end
@@ -399,15 +400,21 @@ function DarkMeter:OnMainFormRefresher()
 	end
 end
 
-
+local fightTimerOn = false
 -- set the timer responsable to refresh the main form's monitored fight duration
 function DarkMeter:startMonitoredFightTimer()
-	Apollo.StartTimer("MonitoredFightTimer")
+	if not fightTimerOn then
+		Apollo.StartTimer("MonitoredFightTimer")
+		fightTimerOn = true
+	end
 end
 
 -- destroy the monitored fight timer
 function DarkMeter:stopMonitoredFightTimer()
-	Apollo.StopTimer("MonitoredFightTimer")
+	if fightTimerOn then
+		Apollo.StopTimer("MonitoredFightTimer")
+		fightTimerOn = false
+	end
 end
 
 
@@ -508,7 +515,7 @@ function DarkMeter:OnUnitEnteredCombat(unit, inCombat)
 		
 		if Group:inCombat() then
 			DarkMeter:startCombatIfNecessary()
-		elseif not Group:inCombat() and currentFight then
+		elseif not Group:inCombat() and currentFight and not DarkMeter.settings.alwaysCapture then
 			DarkMeter:stopAllFights()
 		end
 	end
@@ -733,7 +740,7 @@ end
 function CombatUtils:processFormattedSkill(skill)
 	-- TODO skill.targetKilled will probably add the skill and unit only to the overall fight
 	-- as the currentFight should already be archived
-	if Group:inCombat() or skill.targetkilled then			-- usually the combat ends before the last damage gets processed
+	if Group:inCombat() or skill.targetkilled or DarkMeter.settings.alwaysCapture then			-- usually the combat ends before the last damage gets processed
 		-- process the skill only if the a group member or a group member's pet is involved
 		if Group.members[skill.casterId] ~= nil or ( skill.ownerId ~= nil and Group.members[skill.ownerId] ~= nil ) or (skill.targetId ~= nil and Group.members[skill.targetId] ~= nil) then
 			CombatUtils:addUnitsToFight(skill)								-- adds this unit to the currentFight if not already added

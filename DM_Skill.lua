@@ -193,6 +193,8 @@ function Skill:dataFor(stat)
     return self.overhealDone
   elseif stat == "interrupts" then
     return self.interrupts
+  elseif stat == "rawhealDone" then
+    return self.healingDone + self.overhealDone
   else
     Apollo.AddAddonErrorText(DarkMeter, "Skill class cannot pull data for stat: " .. stat)
   end

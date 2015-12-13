@@ -114,7 +114,7 @@ function Fight:paused()
 end
 
 
-local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "damageTaken", "deaths"}
+local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "damageTaken", "deaths", "rawhealDone"}
 
 for i = 1, #stats do
   Fight[stats[i]] = function(fight)

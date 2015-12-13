@@ -78,6 +78,8 @@ function DMUtils:titleForStat(stat, short)
 		return short and "Dth" or "Deaths"
   elseif stat == "dps" then
     return short and "Dps" or "Dps"
+  elseif stat == "rawhealDone" then
+    return short and "rHeal" or "Heal + overheal"
 	-- TODO other stats
 	end
 end

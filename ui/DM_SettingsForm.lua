@@ -25,6 +25,8 @@ function SettingsForm:init(xmlDoc)
     SettingsForm.buttons = SettingsForm.form:FindChild("Buttons")
     SettingsForm.rowHeightSlider = SettingsForm.buttons:FindChild("RowHeight"):FindChild("Slider"):FindChild("SliderBar")
     SettingsForm.rowHeightBox = SettingsForm.buttons:FindChild("RowHeight"):FindChild("RowHeightBox")
+    SettingsForm.bgOpacitySlider = SettingsForm.buttons:FindChild("BgOpacity"):FindChild("Slider"):FindChild("SliderBar")
+    SettingsForm.bgOpacityBox = SettingsForm.buttons:FindChild("BgOpacity"):FindChild("BgOpacityBox")
 
     SettingsForm.form:Show(false)
   else
@@ -103,7 +105,7 @@ function SettingsForm.controls:OnMapChangeReset(wndH, wndC, eBtn)
   end
 end
 
-
+-- row height functions
 function SettingsForm.controls:OnBarHeightChanged(wndH, wndC, fNewVal, fOldVal)
   local val = math.floor(fNewVal)
   SettingsForm.rowHeightBox:SetText(tostring(val))
@@ -124,6 +126,30 @@ function SettingsForm.controls:OnBarHeightBoxChanged(wndH, wndC, sVal)
   DarkMeter.settings.rowHeight = val
   SettingsForm.rowHeightSlider:SetValue(val)
   SettingsForm:reinitUI()
+end
+
+
+-- bg opacity functions
+function SettingsForm.controls:OnBgOpacityChanged(wndH, wndC, fNewVal, fOldVal)
+  local val = math.floor(fNewVal)
+  SettingsForm.bgOpacityBox:SetText(tostring(val))
+  DarkMeter.settings.bgOpacity = val
+  UI.MainForm.content:SetBGOpacity(DarkMeter.settings.bgOpacity/100)
+end
+
+
+function SettingsForm.controls:OnBgOpacityBoxChanged(wndH, wndC, sVal)
+  local val = tonumber(sVal)
+  if val ~= nil then
+    if val < 0 then val = 0 end
+    if val > 100 then val = 100 end
+  else
+    val = DarkMeter.settings.bgOpacity
+  end
+  SettingsForm.rowBgOpacityBox:SetText(val)
+  DarkMeter.settings.bgOpacity = val
+  SettingsForm.bgOpacitySlider:SetValue(val)
+  UI.MainForm.content:SetBGOpacity(DarkMeter.settings.bgOpacity/100)
 end
 
 
@@ -175,6 +201,8 @@ function SettingsForm:setValuesFromSettings()
   self.buttons:FindChild("ResetFightBox"):FindChild("ResetFight" .. DarkMeter.settings.resetMapChange):SetCheck(true)
   self.rowHeightSlider:SetValue(DarkMeter.settings.rowHeight)
   self.rowHeightBox:SetText(DarkMeter.settings.rowHeight)
+  self.bgOpacitySlider:SetValue(DarkMeter.settings.bgOpacity)
+  self.bgOpacityBox:SetText(DarkMeter.settings.bgOpacity)
 end
 
 
@@ -334,7 +362,7 @@ end
 function SettingsForm.boxControls:moveToPos(box, i, tracked)
   SettingsForm.boxWidth = box:GetWidth()
   SettingsForm.boxHeight = box:GetHeight()
-  SettingsForm.boxMargin = 5
+  SettingsForm.boxMargin = 3
   local contHeight = tracked and SettingsForm.tracked:GetHeight() or SettingsForm.untracked:GetHeight()
   local top = (contHeight - SettingsForm.boxHeight) / 2
   local left = SettingsForm.boxMargin + ( (SettingsForm.boxWidth + SettingsForm.boxMargin * 2) * i)

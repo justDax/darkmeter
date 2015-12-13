@@ -207,6 +207,12 @@ function PlayerDetails.controls:OnOverhealDoneTab(wndH, wndC, mouseBtn)
   PlayerDetails.controls:updateSelected(wndH)
 end
 
+function PlayerDetails.controls:OnRawhealDoneTab(wndH, wndC, mouseBtn)
+  PlayerDetails.stat = "rawhealDone"
+  PlayerDetails:updateForm()
+  PlayerDetails.controls:updateSelected(wndH)
+end
+
 function PlayerDetails.controls:OnDamageTakenTab(wndH, wndC, mouseBtn)
   PlayerDetails.stat = "damageTaken"
   PlayerDetails:updateForm()
@@ -799,6 +805,10 @@ function PlayerDetails.botControls:showDetailsForRow(data)
     statType = "healingDone"
   elseif PlayerDetails.stat == "overhealDone" then
     statType = "overhealDone"
+  elseif PlayerDetails.stat == "rawhealDone" then
+    statType = "rawhealDone"
+  else
+    Apollo.AddAddonErrorText(DarkMeter, "Cannot inspect PlayerDetails row for stat: " .. PlayerDetails.stat)
   end
   -- sets table value
   local minCol = PlayerDetails.table:FindChild("MinCol")

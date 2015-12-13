@@ -73,6 +73,7 @@ function UI:OnDocLoaded()
     end
     MainForm:initColumns()
     MainForm.wrapper:RecalculateContentExtents()
+    MainForm.content:SetBGOpacity(DarkMeter.settings.bgOpacity/100)
   end
 end
 
