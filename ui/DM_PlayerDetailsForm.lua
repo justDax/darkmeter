@@ -569,7 +569,7 @@ end
 -- updates a single skill bar: percentage, skill name, text and binds the skill to the row's data, this is useful to grab infos when inspecting a single skill
 function PlayerDetails.botControls:updateSingleSkill(row, percentage, name, skillValue, data)
   row:FindChild("Percentage"):SetText(percentage)
-  row:FindChild("Data"):SetText(value)
+  row:FindChild("Data"):SetText(skillValue)
   row:FindChild("Name"):SetText(name)
   if data == false then
     row:FindChild("Arrow"):Show(false)
@@ -853,12 +853,12 @@ function PlayerDetails.botControls:deathRecapFor(data)
     counter = counter + 1
     PlayerDetails.botControls.deathRecapRows[counter] = PlayerDetails.botControls:createSingleBar(counter, PlayerDetails.fourth, 30)
     local skill = data.skills[i]
-    local text = skill.name .. " - " .. skill.damage
+    local text = skill.name
     if i == 1 then
       text = "[R.I.P.] " .. text
     end
 
-    PlayerDetails.botControls:updateSingleSkill(PlayerDetails.botControls.deathRecapRows[counter], counter .. ")", text, "", false)
+    PlayerDetails.botControls:updateSingleSkill(PlayerDetails.botControls.deathRecapRows[counter], counter .. ")", text, skill.damage, false)
   end
   -- TODO fourth wndow is not scrolling... even with a recalculate content extents, maybe the pixies gets ignored
   PlayerDetails.fourth:RecalculateContentExtents()
