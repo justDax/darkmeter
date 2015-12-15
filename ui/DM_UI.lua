@@ -58,15 +58,6 @@ function UI:OnDocLoaded()
     SelectFight:init(self.xmlDoc)
     SettingsForm:init(self.xmlDoc)
     PlayerDetails:init(self.xmlDoc)
-
-    -- TODO the window popping on the lens is nice but I have two problems to deal with:
-    -- clicking on the selectfight form allow the user to drag the addon
-    -- if the addons is placed on the top part of the screen the popup appears outsive and not completely visible
-
-    -- local inspectBtn = MainForm.form:FindChild("Header"):FindChild("InspectFight")
-    -- SelectFight.form = Apollo.LoadForm(self.xmlDoc, "SelectFightForm", inspectBtn, SelectFight.controls)
-
-    -- for now I'll just place the form at the center of the screen, I'l implement a better popup in the future
     
     if MainForm.initialLocation then -- location loaded from saved settings
       MainForm.form:MoveToLocation(WindowLocation.new(MainForm.initialLocation))

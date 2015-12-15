@@ -1,6 +1,3 @@
--- TODO
--- This requires a lot of work to be detached from the UI file
-
 -------------------------------------------------------------
 -- MainForm Controls
 -------------------------------------------------------------
@@ -527,7 +524,7 @@ function MainForm.controls:OnRowMouseEnter(wndH, wndC, x, y)
         totalTop = totalTop + top
         win = win:GetParent()
       end
-      -- TODO the top value doesn't count if the for is scrolled !
+      totalTop = totalTop - MainForm.wrapper:GetVScrollPos()
 
       MainForm.tooltipControls:setText(lines)
       MainForm.tooltipControls:show()

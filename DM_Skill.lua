@@ -4,9 +4,6 @@ local DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
 
 
 function Skill:new()
-
-  -- TODO how do I manage critical multihits?
-  -- possible soltion: add a table called multicrit to damage and heals and add there critical multihits
   local initialValues = {
     name = "",
     damage = {
@@ -37,8 +34,6 @@ end
 
 -- adds new input to the current skill
 function Skill:add(formattedSkill)
-  -- TODO don't increment total at each dot thick, this leads to an incorrect deflect percentage and crit count
-
   -- set skill name
   if self.name == "" and formattedSkill.name then
     self.name = formattedSkill.name

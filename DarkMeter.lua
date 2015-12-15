@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.5.0"
+DarkMeter.version = "0.5.1"
 
 
 
@@ -276,6 +276,7 @@ function DarkMeter:addTracked(name, index)
 	end
 	table.insert(self.settings.selectedStats, index, name)
 	UI.MainForm:initColumns()
+	UI.needsUpdate = true
 	self:updateUI()
 end
 
@@ -286,6 +287,7 @@ function DarkMeter:removeTracked(name)
 		if stats[i] == name then
 			table.remove(self.settings.selectedStats, i)
 			UI.MainForm:initColumns()
+			UI.needsUpdate = true
 			self:updateUI()
 			break
 		end
@@ -901,7 +903,6 @@ function DarkMeter:OnCombatLogTransference(e)
 		Print("Log Transference")
 	end
 
-	-- TODO! need to test this part better
 	local skill = CombatUtils:formatCombatAction(e, {
 		typology = "damage"
 	})
@@ -926,13 +927,8 @@ function DarkMeter:OnCombatLogTransference(e)
 				ownerName = skill.onwerName,
 				multihit = skill.multihit,
 				typology = "healing",
-				
-				-- TODO keep track of this part, I think it might get changed in the future
-				-- manually calculate heal and overheal beause the api is kinda illogical here
-				-- while on the CombatLogHeal event the heal returned is the real value with overheals subtracted
-				-- for this event (for no reason at all) I need to manually subtract the overhealing portion from the heal
 				overheal = e.tHealData[i].nOverheal,
-				heal = e.tHealData[i].nHealAmount - e.tHealData[i].nOverheal
+				heal = e.tHealData[i].nHealAmount
 			})
 			CombatUtils:processFormattedSkill(healEffect)
 		end
@@ -955,7 +951,6 @@ function DarkMeter:OnCombatLogCCState(e)
 end
 
 -- This event fires whenever an attack gets a Multi-Hit proc, but is completely absorbed by shields
--- TODO check this event if gets processed normally, as there's no documentation on Houston
 function DarkMeter:OnCombatLogMultiHitShields(e)
 	if _G.DarkMeter.Development then
 		Print("Multihit! Absorbed!")
@@ -984,7 +979,6 @@ function DarkMeter:OnCombatLogFallingDamage(e)
 end
 
 -- This event fires whenever an attack is completely absorbed by shields.
--- TODO check this event if gets processed normally, as there's no documentation on Houston
 function DarkMeter:OnCombatLogDamageShields(e)
 	if _G.DarkMeter.Development then
 		Print("DAMEIG! Absorbed!")

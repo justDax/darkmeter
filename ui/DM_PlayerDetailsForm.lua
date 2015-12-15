@@ -860,7 +860,6 @@ function PlayerDetails.botControls:deathRecapFor(data)
 
     PlayerDetails.botControls:updateSingleSkill(PlayerDetails.botControls.deathRecapRows[counter], counter .. ")", text, skill.damage, false)
   end
-  -- TODO fourth wndow is not scrolling... even with a recalculate content extents, maybe the pixies gets ignored
   PlayerDetails.fourth:RecalculateContentExtents()
 end
 
