@@ -28,7 +28,7 @@ function Unit:new(wsUnit)
   unit.skills = {}          -- all skill casted by that unit, key is the skill name, and the value is a Skill instance
   unit.damagingSkillsTaken = {}     -- all skills casted from enemies to the unit (storead as: {enemyName = {skillname = Skill, skillname2 = skill2}})
   unit.deathCount = 0
-  unit.deathsRecap = {}                  -- array of tables, each table is like {timestamp = {GameLib.GetLocalTime()}, skills = array with the lasdt 10 skills taken}
+  unit.deathsRecap = {}                  -- array of tables, each table is like {timestamp = {GameLib.GetLocalTime()}, skills = array with the last 10 skills taken}
   unit.totalFightTime = 0
   unit.lastActionTimestamp = nil        -- timestamp of the last action, used to calc dps
   unit.pets = {}            -- table:  key = pet name, value = Unit instance

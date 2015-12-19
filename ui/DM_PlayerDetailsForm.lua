@@ -175,6 +175,17 @@ function PlayerDetails.controls:updateSelected(wnd)
 end
 
 
+-- shout a player's death to the chat
+function PlayerDetails.controls:OnReportDeath()
+  Print("Reporting death...")
+  if not PlayerDetails.botControls.inspectedDeath then return end
+  Print("inspecting death, good")
+
+  UI.DeathRecapForm.death = PlayerDetails.botControls.inspectedDeath
+  UI.DeathRecapForm:show()
+end
+
+
 
 
 
@@ -652,6 +663,7 @@ end
 -- go back one window
 function PlayerDetails.controls:OnPrevWin()
   PlayerDetails.skillDetails = nil
+  PlayerDetails.botControls.inspectedDeath = nil
   if #PlayerDetails.prevWindows > 0 then
     PlayerDetails.botControls:goToWindow(PlayerDetails.prevWindows[#PlayerDetails.prevWindows])
 
@@ -835,7 +847,7 @@ end
 
 -- shows last 10 damage taken before death inside the fourth window
 function PlayerDetails.botControls:deathRecapFor(data)
-  -- local name = data.timestamp.nHour .. ":" .. data.timestamp.nMinute .. " (last 10 damage taken)"
+  PlayerDetails.botControls.inspectedDeath = data
   local name = "last 10 damage taken"
   PlayerDetails.fourth:FindChild("Name"):SetText(name)
 

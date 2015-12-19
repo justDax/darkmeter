@@ -319,7 +319,7 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
   options.background = ApolloColor.new("99555555")
   if DMUtils.classes[unit.classId] ~= nil then
     local bg = DMUtils.classes[unit.classId].color
-    options.background = ApolloColor.new(bg[1], bg[2], bg[3], 0.6)
+    options.background = ApolloColor.new(bg[1], bg[2], bg[3], 0.3)
   end
 
   -- set name

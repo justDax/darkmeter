@@ -8,6 +8,7 @@
     <Script Name="DM_Fight.lua"/>
     <Script Name="ui/DM_ResetForm.lua"/>
     <Script Name="ui/DM_ReportForm.lua"/>
+    <Script Name="ui/DM_DeathRecapForm.lua"/>
     <Script Name="ui/DM_SelectFightForm.lua"/>
     <Script Name="ui/DM_SettingsForm.lua"/>
     <Script Name="ui/DM_PlayerDetailsForm.lua"/>

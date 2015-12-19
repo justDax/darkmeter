@@ -16,6 +16,7 @@ local MainForm = Apollo.GetPackage("DarkMeter:MainForm").tPackage             --
 local ResetForm = Apollo.GetPackage("DarkMeter:ResetForm").tPackage            -- prompt reset data form and all the correlated functions
 UI.lastFight = nil           -- contains reference to the last merged fight
 local ReportForm = Apollo.GetPackage("DarkMeter:ReportForm").tPackage           -- form used to report the addon data into ingame chat
+local DeathRecapForm = Apollo.GetPackage("DarkMeter:DeathRecapForm").tPackage           -- form used to report a player's death
 local SelectFight = Apollo.GetPackage("DarkMeter:SelectFight").tPackage           -- form to select which fight inspect
 local SettingsForm = Apollo.GetPackage("DarkMeter:SettingsForm").tPackage
 local PlayerDetails = Apollo.GetPackage("DarkMeter:PlayerDetails").tPackage
@@ -55,6 +56,7 @@ function UI:OnDocLoaded()
     MainForm:init(self.xmlDoc)
     ResetForm:init(self.xmlDoc)
     ReportForm:init(self.xmlDoc)
+    DeathRecapForm:init(self.xmlDoc)
     SelectFight:init(self.xmlDoc)
     SettingsForm:init(self.xmlDoc)
     PlayerDetails:init(self.xmlDoc)
@@ -336,6 +338,7 @@ end
 UI.MainForm = MainForm
 UI.ResetForm = ResetForm
 UI.ReportForm = ReportForm
+UI.DeathRecapForm = DeathRecapForm
 UI.SelectFight = SelectFight
 UI.SettingsForm = SettingsForm
 UI.PlayerDetails = PlayerDetails
