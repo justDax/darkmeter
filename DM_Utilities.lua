@@ -112,7 +112,25 @@ function DMUtils.formatNumber(num, places, bShortFormat)
         ret = DMUtils.roundToNthDecimal(num, places) -- hundreds
     end
   else
-    ret = DMUtils.roundToNthDecimal(num, places) -- hundreds
+    if not num then
+      return 0
+    elseif num >= 1000 then
+      ret = ""
+      local mod = (num % 1) * ( math.pow(10, places) )
+      local n = num
+      while n/1000 > 1 do
+        if ret ~= "" then ret = "," .. ret end
+        ret = ("%03d"):format(math.floor(n % 1000)) .. ret
+        n = n/1000
+      end
+      ret = math.floor(n) .. "," .. ret
+      if places > 0 then 
+        ret = ret .. "." .. ("%d"):format(mod)
+      end
+
+    else
+      ret = DMUtils.roundToNthDecimal(num, places) -- hundreds
+    end
   end
   return ret
 end
