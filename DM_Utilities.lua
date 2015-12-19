@@ -38,8 +38,10 @@ function DMUtils:iconForClass(unit)
     	return "IconSprites:Icon_SkillEngineer_Artillery_Bot"
     elseif unit.name == "Geist" then -- esper geist
     	return "IconSprites:Icon_SkillEsper_Geist"
-    elseif unit.name == "Phantom" then -- esper phantom (wtf, no icon available for this skill on houston...)
-    	return "IconSprites:Icon_Pets_Icon_PinkSquirgSquishling" -- return a pink squid pet icon...
+    elseif unit.name == "Phantom" then
+    	return "Icon_SkillShadow_UI_SM_undrwrlddrms"
+    elseif unit.name == "Figment" then -- pet generated from esper's "Figment" amp 
+      return "IconSprites:Icon_Pets_Icon_PinkSquirgSquishling" -- return a pink squid pet icon...
     end
   end
   return nil
