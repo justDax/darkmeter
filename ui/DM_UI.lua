@@ -99,14 +99,16 @@ function Row:new(parent, i)
   row.lastRank = 0
 
   row.icon = row.bar:FindChild("Icon")
-  row.iconMoveLeft = 30
+  row.iconLeft = row.icon:GetAnchorOffsets() -- this is the initial left offset value for the icon and must not be changed, is for reference only
+  row.iconMoveLeft = row.iconLeft
   row.iconVisible = true
   row.lastIcon = ""
 
   row.name = row.bar:FindChild("Name")
   row.nameVisible = true
   row.strName = row.name:GetText()
-  row.nameMoveLeft = 55
+  row.nameLeft = row.name:GetAnchorOffsets() -- this is the initial left offset value for the icon and must not be changed, is for reference only
+  row.nameMoveLeft = row.nameLeft
 
   row.bg = row.bar:FindChild("Background")
   row.bgVisible = true
@@ -167,7 +169,7 @@ function Row:update(options)
       self.rank:Show(false)
       self.rankVisible = false
     end
-    moveLeft = moveLeft + 25
+    moveLeft = moveLeft + 20
   end
 
   
@@ -185,8 +187,8 @@ function Row:update(options)
       self.lastIcon = options.icon
     end
     -- update the position only if the moveLeft var has changed, this happens after unchecking the show ranks options
-    if self.iconMoveLeft ~= (30 - moveLeft) or heightChanged then
-      self.icon:SetAnchorOffsets( (30 - moveLeft), math.ceil((DarkMeter.settings.rowHeight - 20) / 2), (50 -  moveLeft), (math.ceil((DarkMeter.settings.rowHeight - 20) / 2) + 20))
+    if self.iconMoveLeft ~= (self.iconLeft - moveLeft) or heightChanged then
+      self.icon:SetAnchorOffsets( (self.iconLeft - moveLeft), math.ceil((DarkMeter.settings.rowHeight - 20) / 2), ((self.iconLeft + 20) -  moveLeft), (math.ceil((DarkMeter.settings.rowHeight - 20) / 2) + 20))
       self.iconMoveLeft = moveLeft
     end
   else
@@ -194,7 +196,7 @@ function Row:update(options)
       self.icon:Show(false)
       self.iconVisible = false
     end
-    moveLeft = moveLeft + 25
+    moveLeft = moveLeft + 20
   end
 
   -- NAME
@@ -209,9 +211,9 @@ function Row:update(options)
       self.strName = options.name
     end
     -- move name window if the showranks or showicons options has changed
-    if self.nameMoveLeft ~= (55 - moveLeft) then
+    if self.nameMoveLeft ~= (self.nameLeft - moveLeft) then
       local left, top, right, bot = self.name:GetAnchorOffsets()
-      self.name:SetAnchorOffsets( (55 - moveLeft), top, right, bot)
+      self.name:SetAnchorOffsets( (self.nameLeft - moveLeft), top, right, bot)
       self.nameMoveLeft = moveLeft
     end
   elseif self.nameVisible then
