@@ -8,7 +8,7 @@
 require "Window"
 
 local DarkMeter = {}
-DarkMeter.version = "0.5.1"
+DarkMeter.version = "0.5.2"
 
 
 
@@ -397,7 +397,7 @@ end
 -- main form refresh timer
 function DarkMeter:OnMainFormRefresher()
 	local deltaTime = GameLib.GetGameTime() - UI.lastUpdate
-	if Group:inCombat() and deltaTime >= 0.5 then
+	if Group:inCombat() and deltaTime >= 0.3 then
 		self:updateUI()
 	end
 end
