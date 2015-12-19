@@ -522,7 +522,7 @@ function PlayerDetails.botControls:updateBottomPart(unitSkills)
     local value = ""
 
     if PlayerDetails.stat == "deaths" then
-      percentage = skill.timestamp.nHour .. ":" .. skill.timestamp.nMinute
+      percentage = ("%02d"):format(skill.timestamp.nHour) .. ":" .. ("%02d"):format(skill.timestamp.nMinute)
       name = skill.killerName
       dataToBind = skill
     else
