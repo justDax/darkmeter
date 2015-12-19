@@ -37,8 +37,9 @@ end
 
 -- reinit mainform columns and rows
 function SettingsForm:reinitUI()
-  UI.MainForm:clear()
-  UI.MainForm:initColumns()
+  -- UI.MainForm:clear()
+  UI.MainForm:updateColsHeight()
+  UI.MainForm:createTitles()
   UI.MainForm:showGroupStats()
 
   -- updates PlayerDetails if opened

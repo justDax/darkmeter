@@ -166,7 +166,7 @@ end
 -------------------------------------------------------------
 
 
--- mainform columns initialization
+-- mainform columns initialization or update
 -- sets title, creates columns, prepare columns variables...
 function MainForm:initColumns()
   self.contentWidth = self.content:GetWidth()
@@ -181,54 +181,46 @@ function MainForm:initColumns()
 
   -- for each selected stats initialize a column
   if stats[1] then
+    -- remove the "No stats selected text"
     MainForm.content:SetText("")
+
+    -- calculate columns widths
+    local totalWidth = self.contentWidth
+    local mainColWidth = (totalWidth - (#stats -1) * UI.minColWidth )
+    local otherColsWidth = UI.minColWidth
+    local nWrapperHeight = MainForm.wrapper:GetHeight()
+    local nWrapperWidth = MainForm.wrapper:GetWidth()
+
 
     for i = 1, #stats do
       if self.cols[i] == nil then
         self.cols[i] = {}
       end
-      -- sets the column with the right form template
+      -- sets the column with the right form template if it doesn't exists
       if not self.cols[i].column then
         self.cols[i].column = Apollo.LoadForm(UI.xmlDoc, "ColTemplate", MainForm.content, MainForm.controls)
       end
 
-      local totalWidth = self.contentWidth
-      local mainColWidth = (totalWidth - (#stats -1) * UI.minColWidth )
-      local otherColsWidth = UI.minColWidth
       local colWidth = i == 1 and mainColWidth or otherColsWidth
 
       local left = i == 1 and 0 or (mainColWidth + (i - 2) * otherColsWidth )
       local rowsHeight = ( (1 + rowHeight) * (rowsQt + 1) )
-      local colHeight = math.max(MainForm.wrapper:GetHeight(), rowsHeight)
+      local colHeight = math.max(nWrapperHeight, rowsHeight)
 
       if i == 1 then -- set container position only once
-        local x, y = MainForm.content:GetAnchorOffsets()
-        MainForm.content:SetAnchorOffsets(x, y, (x + MainForm.wrapper:GetWidth() - 13), (y + colHeight) )
+        local left, top, right, bot = MainForm.content:GetAnchorOffsets()
+        MainForm.content:SetAnchorOffsets(left, top, (left + nWrapperWidth - 13), (top + colHeight) )
       end
+      -- sets column position and size
+      self.cols[i].column:SetAnchorOffsets(left, 0, (left + colWidth), colHeight)
 
-      local newLocation = WindowLocation.new({ fPoints = {0, 0, 0, 0}, nOffsets = {left, 0, (left + colWidth), colHeight} })
-
-
-      self.cols[i].column:MoveToLocation(newLocation)
-
-      -- save current col width
-      self.colWidth[i] = self.cols[i].column:GetWidth()
-      -- create column title
-      if self.cols[i].header then
-        self.cols[i].header.bar:Destroy()
-        self.cols[i].header = nil
-      end
-      self.cols[i].header = UI.Row:new(self.cols[i].column, 1)
-      
-      -- update title with the correct infos
-      MainForm.cols[i].header:update({
-        icon = false,
-        title = i == 1 and "Name" or false,
-        background = false,
-        text = i == 1 and DMUtils:titleForStat(stats[i]) or DMUtils:titleForStat(stats[i], true),
-        width = self.colWidth[i]
-      })
+      -- save current col width, used to calculate row width based on % of stat contribution
+      self.colWidth[i] = self.cols[i].column:GetWidth()  
     end
+    -- creates or updates columns headers
+    MainForm:createTitles()
+
+  -- if no stats are selected, just display a message
   else
     local colHeight = MainForm.wrapper:GetHeight()
     local x, y = MainForm.content:GetAnchorOffsets()
@@ -244,8 +236,57 @@ function MainForm:initColumns()
     end
   end
 
+end
+
+
+-- update columns height, called when a row is added or removed
+function MainForm:updateColsHeight()
+  local nRowHeight = DarkMeter.settings.rowHeight
+  local nWrapperHeight = MainForm.wrapper:GetHeight()
+  local nColHeight = 0 -- set holheight here to have a reference later and set container's height
+
+  for _, col in pairs(MainForm.cols) do
+    local nRows = #col.rows
+    local nTotalRowsHeight = ( (1 + nRowHeight) * (nRows + 1) )
+    nColHeight = math.max(nWrapperHeight, nTotalRowsHeight)
+    local left, top, right, bot = col.column:GetAnchorOffsets()
+    col.column:SetAnchorOffsets(left, top, right, (top + nColHeight))
+  end
+  -- set columns container height
+  local left, top, right, bot = MainForm.content:GetAnchorOffsets()
+  MainForm.content:SetAnchorOffsets(left, top, right, (top + nColHeight) )
+
   self.wrapper:RecalculateContentExtents()
 end
+
+-- create or updates all titles
+function MainForm:createTitles()
+  for i = 1, #DarkMeter.settings.selectedStats do
+    MainForm:createTitleForStat(i)
+  end
+end
+
+
+-- create or update a specific title given a column index
+function MainForm:createTitleForStat(i)
+  local stats = DarkMeter.settings.selectedStats
+
+  -- create column title if needed
+  if self.cols[i].header == nil then
+    self.cols[i].header = UI.Row:new(self.cols[i].column, 1)
+  end
+  
+  -- update title with the correct infos
+  MainForm.cols[i].header:update({
+    icon = false,
+    rank = false,
+    title = i == 1 and "Name" or false,
+    background = false,
+    text = DMUtils:titleForStat(stats[i], (i ~= 1)),
+    width = self.colWidth[i]
+  })
+end
+
 
 
 -- returns the options to update a single bar texts, icons, color, data etc...
@@ -254,8 +295,11 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
   local options = {}
 
   -- set unit and stat reference
-  options.unit = unit
-  options.stat = stats[column]
+  options.unit = {
+    id = unit.id,
+    name = unit.name,
+    pet = unit.pet
+  }
 
   -- set rank
   if rank ~= nil and column == 1 then
@@ -272,11 +316,11 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
   end
 
   -- set background
-  local bg = {0.3, 0.3, 0.3}
+  options.background = ApolloColor.new("99555555")
   if DMUtils.classes[unit.classId] ~= nil then
-    bg = DMUtils.classes[unit.classId].color
+    local bg = DMUtils.classes[unit.classId].color
+    options.background = ApolloColor.new(bg[1], bg[2], bg[3], 0.6)
   end
-  options.background = ApolloColor.new(bg[1], bg[2], bg[3], 0.3)
 
   -- set name
   if column == 1 then
@@ -305,7 +349,8 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
     
     -- sets bar text
     local num = DMUtils.formatNumber( value, 1 , DarkMeter.settings.shortNumberFormat )
-    if column == 1 and value > 0 then
+    -- enable percentage only for the first column, if the value is bigger than 0 and is not the DPS stat
+    if column == 1 and value > 0 and DarkMeter.settings.selectedStats[column] ~= "dps" then
       local percent = DMUtils.roundToNthDecimal( value / tempFight[stats[i]](tempFight) * 100, 1 )
       options.text = num .. " (" .. percent .. "%)"
     else
@@ -365,7 +410,8 @@ function MainForm:showGroupStats()
   local stats = DarkMeter.settings.selectedStats
 
   if UI.lastFight and stats[1] then
-    
+    local rowsNumberChanged = false
+
     -- sort all group members by the main stat being monitored
     local orderedUnits = UI.lastFight:orderMembersBy(stats[1])
     -- local maxVal = orderedUnits[1][stats[1]](orderedUnits[1]) -- the first (highest) value of the stats passes, used to calculate bar width for others party members
@@ -383,7 +429,7 @@ function MainForm:showGroupStats()
       for i = 1, #orderedUnits do
         if MainForm.cols[index].rows[i] == nil then
           MainForm.cols[index].rows[i] = UI.Row:new(MainForm.cols[index].column, i + 1)
-          MainForm:initColumns() --  a new row has been added and I need to recalculate col heights
+          rowsNumberChanged = true --  a new row has been added and I need to recalculate col heights
         end
         local options = MainForm:formatRowOptions(orderedUnits[i], UI.lastFight, index, maxVal, i)
         MainForm.cols[index].rows[i]:update(options)
@@ -397,13 +443,19 @@ function MainForm:showGroupStats()
         for index = #orderedUnits +1, #MainForm.cols[i].rows do
           MainForm.cols[i].rows[index].bar:Destroy()
           MainForm.cols[i].rows[index] = nil
-          MainForm:initColumns() --  a row has been removed and I need to recalculate col heights
         end
+        rowsNumberChanged = true --  one or more rows has been removed and I need to recalculate col heights
       end
     end
+
+    if rowsNumberChanged then
+      MainForm:updateColsHeight()
+    end
+
   else
     MainForm:clear()
   end
+
 
   UI.lastUpdate = GameLib.GetGameTime()
 end
@@ -550,12 +602,25 @@ end
 
 
 function MainForm.controls:OnRowPlayerDetails(wndH, wndC, mouseBtn, x, y)
-  if wndH == wndC then
+  if wndH == wndC and mouseBtn == 0 and UI.lastFight then
     local data = wndH:GetData()
     if data ~= nil then
-      local unit = data.unit
+      local unit = nil
+      
+      if data.pet then
+        for id, u in pairs(UI.lastFight.groupMembers) do
+          for petName, petUnit in pairs(u.pets) do
+            if data.name == petName then
+              unit = petUnit
+              break
+            end
+          end
+        end
+      else
+        unit = UI.lastFight.groupMembers[data.id]
+      end
 
-      if mouseBtn == 0 and unit ~= nil then
+      if unit ~= nil then
         UI.PlayerDetails:setPlayer(unit)
         UI.PlayerDetails:show()
       end

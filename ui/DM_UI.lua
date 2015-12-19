@@ -89,92 +89,186 @@ function Row:new(parent, i)
   row.bar:SetAnchorOffsets( 1, top, -1, (top + rowHeight ) )
   row.index = i
 
+  -- set row elements references and last used values to prevent updating elements with the same values
+  row.currentHeight = DarkMeter.settings.rowHeight
+
+  row.rank = row.bar:FindChild("Rank")
+  row.rankVisible = false -- the rank is visible initially... but I set it to false to let the update function set the rank text correctly
+  row.lastRank = 0
+
+  row.icon = row.bar:FindChild("Icon")
+  row.iconMoveLeft = 30
+  row.iconVisible = true
+  row.lastIcon = ""
+
+  row.name = row.bar:FindChild("Name")
+  row.nameVisible = true
+  row.strName = row.name:GetText()
+  row.nameMoveLeft = 55
+
+  row.bg = row.bar:FindChild("Background")
+  row.bgVisible = true
+  row.lastBg = ApolloColor.new("99555555")
+
+  row.text = row.bar:FindChild("Data")
+  row.lastText = row.text:GetText()
+  row.textVisible = true
+
+  row.currentWidth = false   -- set to false because the width needs to be initialized and depends on the form width/columns
+
+  row.currentData = {}
+
+  -- end variables
+
+  -- center the icon vertically
+  row.icon:SetAnchorOffsets( row.iconMoveLeft, math.ceil((DarkMeter.settings.rowHeight - 20) / 2), (row.iconMoveLeft + 20), (math.ceil((DarkMeter.settings.rowHeight - 20) / 2) + 20))
 
   self.__index = self
   return setmetatable(row, self)
 end
 
 function Row:update(options)
-  local rankWnd = self.bar:FindChild("Rank")
   local moveLeft = 0
-
-  if DarkMeter.settings.showRanks then
-    if options.rank then
-      rankWnd:Show(true)
-      rankWnd:SetText(tostring(options.rank))
+  -- auto update row height if the height settings has been changed
+  local heightChanged = false
+  if self.currentHeight ~= DarkMeter.settings.rowHeight then
+    local left, top, right, bot = self.bar:GetAnchorOffsets()
+    top = (1 * DarkMeter.settings.rowHeight ) * (self.index - 1) + 1;
+    self.bar:SetAnchorOffsets( left, top, right, (top + DarkMeter.settings.rowHeight))
+    self.currentHeight = DarkMeter.settings.rowHeight
+    heightChanged = true
+  end
+  
+  -- RANK
+  if DarkMeter.settings.showRanks and options.rank ~= false then
+    if not self.rankVisible then
+      self.rank:Show(true)
+      self.rankVisible = true
+    end
+    -- update rank only if it changes
+    if self.lastRank ~= options.rank and options.rank then
+      self.rank:SetText(tostring(options.rank))
+      
       if options.rank == 1 then
-        rankWnd:SetTextColor(ApolloColor.new("ffcec313"))
+        self.rank:SetTextColor(ApolloColor.new("ffcec313"))
       elseif options.rank == 2 then
-        rankWnd:SetTextColor(ApolloColor.new("ffc3d5dc"))
+        self.rank:SetTextColor(ApolloColor.new("ffc3d5dc"))
       elseif options.rank == 3 then
-        rankWnd:SetTextColor(ApolloColor.new("ff783d1d"))
+        self.rank:SetTextColor(ApolloColor.new("ff783d1d"))
       else
-        rankWnd:SetTextColor(ApolloColor.new("ffffffff"))
+        self.rank:SetTextColor(ApolloColor.new("ffffffff"))
       end
-    elseif options.rank == false then
-      rankWnd:Show(false)
+      self.lastRank = options.rank
     end
   else
-    rankWnd:Show(false)
+    if self.rankVisible then
+      self.rank:Show(false)
+      self.rankVisible = false
+    end
     moveLeft = moveLeft + 25
   end
 
-  if DarkMeter.settings.showClassIcon then
-    if options.icon then
-      local icon = self.bar:FindChild("Icon")
-      icon:Show(true)
-      icon:SetSprite(options.icon)
-      icon:SetAnchorOffsets( (30 - moveLeft), math.ceil((DarkMeter.settings.rowHeight - 20) / 2), (50 -  moveLeft), (math.ceil((DarkMeter.settings.rowHeight - 20) / 2) + 20))
-    elseif options.icon == false then
-      self.bar:FindChild("Icon"):Show(false)
+  
+  -- ICON
+  if DarkMeter.settings.showClassIcon and options.icon ~= false then
+    if not self.iconVisible then
+      self.icon:Show(true)
+      self.iconVisible = true
+    end
+    -- set fallback icon when the correct icon for this unit/pet is not available
+    if options.icon == nil then options.icon = "BK3:sprHolo_Friends_Single" end
+    -- update icon if has changed
+    if self.lastIcon ~= options.icon then
+      self.icon:SetSprite(options.icon)
+      self.lastIcon = options.icon
+    end
+    -- update the position only if the moveLeft var has changed, this happens after unchecking the show ranks options
+    if self.iconMoveLeft ~= (30 - moveLeft) or heightChanged then
+      self.icon:SetAnchorOffsets( (30 - moveLeft), math.ceil((DarkMeter.settings.rowHeight - 20) / 2), (50 -  moveLeft), (math.ceil((DarkMeter.settings.rowHeight - 20) / 2) + 20))
+      self.iconMoveLeft = moveLeft
     end
   else
-    self.bar:FindChild("Icon"):Show(false)
+    if self.iconVisible then
+      self.icon:Show(false)
+      self.iconVisible = false
+    end
     moveLeft = moveLeft + 25
   end
 
+  -- NAME
   if options.name then
-    local nameWindow = self.bar:FindChild("Name")
-    nameWindow:Show(true)
-    nameWindow:SetText(options.name)
-    local left, top, right, bot = nameWindow:GetAnchorOffsets()
-    nameWindow:SetAnchorOffsets( (55 - moveLeft), top, right, bot)
-  elseif options.name == false then
-    self.bar:FindChild("Name"):Show(false)
+    if not self.nameVisible then
+      self.name:Show(true)
+      self.nameVisible = true
+    end
+    -- set name text
+    if self.strName ~= options.name then
+      self.name:SetText(options.name)
+      self.strName = options.name
+    end
+    -- move name window if the showranks or showicons options has changed
+    if self.nameMoveLeft ~= (55 - moveLeft) then
+      local left, top, right, bot = self.name:GetAnchorOffsets()
+      self.name:SetAnchorOffsets( (55 - moveLeft), top, right, bot)
+      self.nameMoveLeft = moveLeft
+    end
+  elseif self.nameVisible then
+    self.name:Show(false)
+    self.nameVisible = false
   end
 
+
+  -- BACKGROUND
   if options.background then
-    local bgWindow = self.bar:FindChild("Background")
-    bgWindow:Show(true)
-    bgWindow:SetBGColor(options.background)
-  elseif options.background == false then
-    self.bar:FindChild("Background"):Show(false)
+    if not self.bgVisible then
+      self.bg:Show(true)
+    end
+
+    if self.lastBg ~= options.background then
+      self.bg:SetBGColor(options.background)
+      self.lastBg = options.background
+    end
+  elseif self.bgVisible then
+    self.bg:Show(false)
+    self.bgVisible = false
   end
 
+
+  -- TEXT
   if options.text then
-    local dataWindow = self.bar:FindChild("Data")
-    dataWindow:Show(true)
-    dataWindow:SetText(options.text)
-  elseif options.text == false then
-    self.bar:FindChild("Data"):Show(false)
+
+    if not self.textVisible then
+      self.text:Show(true)
+      self.textVisible = true
+    end
+
+    if self.lastText ~= options.text then
+      self.text:SetText(options.text)
+      self.lastText = options.text
+    end
+  elseif self.textVisible then
+    self.text:Show(false)
+    self.textVisible = false
   end
 
-  -- width
+  -- WIDTH
   if options.width then
-    local bg = self.bar:FindChild("Background")
-    local newLocation = bg:GetLocation():ToTable()
-    newLocation.nOffsets[3] = options.width
-    bg:MoveToLocation(WindowLocation.new( newLocation ) )
+    if self.currentWidth ~= options.width then
+      local left, top, right, bot = self.bg:GetAnchorOffsets()
+      self.bg:SetAnchorOffsets( left, top, options.width, bot)
+      self.currentWidth = options.width
+    end
   end
-
 
   -- sets unit reference
-  if options.unit and options.stat then
-    self.bar:SetData({
-      unit = options.unit,
-      stat = options.stat
-    })
+  local newData = options.unit
+  
+  -- set data only if the id has changed or the name has changed and the unit is a pet
+  if newData and ( self.currentData.id ~= newData.id or (newData.pet and self.currentData.name ~= newData.name ))  then
+    self.bar:SetData(newData)
+    self.currentData = newData
   end
+  
 end
 
 
@@ -222,7 +316,7 @@ function UI:showDataForFight(fight)
   UI.lastFight = fight
   
   -- limit updates, updating the ui on every combatlog event kills fps
-  if UI.needsUpdate and ( GameLib.GetGameTime() - UI.lastUpdate ) > 0.3 then
+  if UI.needsUpdate and ( GameLib.GetGameTime() - UI.lastUpdate ) >= 0.3 then
     MainForm:showGroupStats()
 
     -- updates PlayerDetails if opened
