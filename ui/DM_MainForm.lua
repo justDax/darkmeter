@@ -280,7 +280,7 @@ function MainForm:createTitleForStat(i)
   MainForm.cols[i].header:update({
     icon = false,
     rank = false,
-    title = i == 1 and "Name" or false,
+    name = i == 1 and "Name" or false,
     background = false,
     text = DMUtils:titleForStat(stats[i], (i ~= 1)),
     width = self.colWidth[i]
