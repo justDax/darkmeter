@@ -15,9 +15,13 @@ local Unit = Apollo.GetPackage("DarkMeter:Unit").tPackage
 local Skill = Apollo.GetPackage("DarkMeter:Skill").tPackage
 local DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
 local DarkMeter
+local fightsTableIndex = 0
 
 function Fight:new()
-  DarkMeter = Apollo.GetAddon("DarkMeter")
+  if DarkMeter == nil then
+    DarkMeter = Apollo.GetAddon("DarkMeter")
+  end
+  fightsTableIndex = fightsTableIndex + 1
 
 	local fight = {}
   fight.groupMembers = {}
@@ -26,9 +30,20 @@ function Fight:new()
   fight.forcedName = nil            -- this is used to force a fight name like "Current fight" or "Overall data"
   fight.totalDuration = 0
   fight.pvpMatch = false
+  fight.id = fightsTableIndex
+  -- reference for total danageDone, healing...
+  fight.damageDoneTotal = 0
+  fight.healingDoneTotal = 0
+  fight.overhealDoneTotal = 0
+  fight.interruptsTotal = 0
+  fight.damageTakenTotal = 0
+  fight.deathsTotal = 0
 
 	self.__index = self
-	return setmetatable(fight, self)
+  setmetatable(fight, self)
+
+  DarkMeter.fights[fight.id] = fight
+	return fight
 end
 
 
@@ -52,7 +67,6 @@ function Fight:addUnit(wsUnit, groupMember)
         if unit.name == unitName then
           -- -- create a new unit that is the clone of the previous unit with the same name
           local newUnit = DMUtils.cloneTable(unit)
-          newUnit.wsUnit = wsUnit
           newUnit.id = unitId
           -- delete old unit and add new one to the groupMembers
           self.groupMembers[id] = nil
@@ -65,6 +79,8 @@ function Fight:addUnit(wsUnit, groupMember)
     -- adds a new unit if no old unit has been merged
     if self[unitTable][unitId] == nil then
       self[unitTable][unitId] = Unit:new(wsUnit)
+      self[unitTable][unitId].fightId = self.id
+      self[unitTable][unitId].enemy = not groupMember
     end
     if self[unitTable][unitId].pet then
       self:addUnit(self[unitTable][unitId].owner, groupMember)
@@ -114,22 +130,19 @@ function Fight:paused()
 end
 
 
-local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "damageTaken", "deaths", "rawhealDone"}
+local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "damageTaken", "deaths"}
 
 for i = 1, #stats do
-  Fight[stats[i]] = function(fight)
-    local total = 0
-    for id, unit in pairs(fight.groupMembers) do
-      total = total + unit[stats[i]](unit)
-      if DarkMeter.settings.mergePets == false then
-        for name, pet in pairs(unit.pets) do
-          total = total + pet[stats[i]](pet)
-        end
-      end
-    end
-    return total
+  Fight[stats[i]] = function(self)
+    return self[stats[i] .. "Total"]
   end
 end
+
+
+function Fight:rawhealDone()
+  return self:healingDone() + self:overhealDone()
+end
+
 
 function Fight:dps()
   local total = 0
@@ -154,10 +167,10 @@ function Fight:orderMembersBy(stat)
 
   local tmp = {}
   for id, unit in pairs(self.groupMembers) do
-    table.insert(tmp, unit)
+    tmp[#tmp + 1] = unit
     if not DarkMeter.settings.mergePets then
       for name, pet in pairs(unit.pets) do
-        table.insert(tmp, pet)
+        tmp[#tmp + 1] = pet
       end
     end
   end
@@ -179,10 +192,10 @@ function Fight:name()
   local topUnit = nil
   for _, unit in pairs(self.enemies) do
     topUnit = topUnit or unit
-    -- TODO check IsInYourGroup() for errors
+    -- TODO
     -- I've implemented this part because in some fights vs some real mobs, I've found my own name as the fight's name
     -- maybe is something generated from some strange buff or an attack reflected pheraps?
-    if unit.rank > topUnit.rank and not unit.wsUnit:IsInYourGroup() then
+    if unit.rank > topUnit.rank and not self.groupMembers[unit.id] then
       topUnit = unit
     end
   end

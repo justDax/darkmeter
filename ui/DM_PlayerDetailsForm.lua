@@ -79,9 +79,13 @@ function PlayerDetails:updateForm()
     -- set class icon
     local unitIcon = DMUtils:iconForClass(self.unit)
     self.content:FindChild("UnitIcon"):SetSprite(unitIcon)
+    
     -- set portrait
-    self.portrait:SetCostume(self.unit.wsUnit)
-    self.portrait:Show(true)
+    -- TODO 
+    -- without the reference to ws unit this it's no longer possible to have a portrait I'll need to adapt the graphic...
+    -- self.portrait:SetCostume(self.unit.wsUnit)
+    -- self.portrait:Show(true)
+
     -- set level
     PlayerDetails.level:SetText(self.unit.level)
 

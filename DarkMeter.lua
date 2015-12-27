@@ -37,6 +37,8 @@ DarkMeter.initialized = false							-- this flag will be set to true when the ad
 DarkMeter.specificFight = nil 						-- reference to a specific fight instance, if the user is inspecting a single fight, if nil and overall is false, the currentFight is shown
 DarkMeter.paused = false
 DarkMeter.playerInPvPMatch =	false				-- true if player enters a pvp match, like bg or arena
+DarkMeter.fights = {}											-- table of all fights instanciated
+DarkMeter.units = {}											-- table of all units instanciated
 
 
 -- list of the stats the user can monitor
@@ -383,6 +385,16 @@ end
 
 -- reset current fight and fight archive and calls ui clean
 function DarkMeter:resetData()
+	-- clear fights
+	for _, fight in pairs(DarkMeter.fights) do
+		fight = nil
+	end
+	DarkMeter.fights = {}
+	-- clear units
+	for _, unit in pairs(DarkMeter.units) do
+		unit = nil
+	end
+	DarkMeter.units = {}
 	fightsArchive = {}
 	currentFight = nil
 	overallFight = nil
@@ -464,7 +476,7 @@ function DarkMeter:updateGroup()
 			local unit = GroupLib.GetUnitForGroupMember(i)
 			if unit ~= nil then
 				Group:addMember(unit)
-				table.insert(newMembersIds, unit:GetId())
+				newMembersIds[#newMembersIds + 1] = unit:GetId()
 			end
 		end
 
@@ -521,7 +533,7 @@ function DarkMeter:OnUnitEnteredCombat(unit, inCombat)
 			DarkMeter:stopAllFights()
 		end
 	end
-	CombatUtils:updateCurrentFight()
+	CombatUtils.updateCurrentFight()
 end
 
 
@@ -562,7 +574,7 @@ CombatUtils.Events = {}
 CombatUtils.formattedSkills = {}
 
 -- debug function only, not necessary
-function CombatUtils:updateCurrentFight()
+function CombatUtils.updateCurrentFight()
 	if _G.DarkMeter.Development then
 		SendVarToRover("overallFight", overallFight)
 		SendVarToRover("currentFight", currentFight)
@@ -573,86 +585,84 @@ end
 
 
 -- return a formatted combat action table
-function CombatUtils:formatCombatAction(e, customValues)
-	-- list of last 10 processed combat events, for development
-	table.insert(CombatUtils.Events, 1, e)
-	-- CombatUtils.Events[11] = nil
+function CombatUtils.formatCombatAction(e, customValues)
+	-- list of last 100 processed combat events, for development
 	if _G.DarkMeter.Development then
+		table.insert(CombatUtils.Events, 1, e)
+		CombatUtils.Events[101] = nil
 		SendVarToRover("CapturedEvents", CombatUtils.Events)
 		SendVarToRover("lastLogEvent", e)
 	end
 
 
-	-- force combat start if player is in combat (fix for a reloadui when in combat)
-	if Group.members[GameLib.GetPlayerUnit():GetId()].inCombat then
+	-- force combat start if player is in combat (this fixes a reloadui when in combat)
+	local playerId = GameLib.GetPlayerUnit():GetId()
+	if Group.members[playerId] and Group.members[playerId].inCombat then
 		DarkMeter:startCombatIfNecessary()
 	end
 
-	customValues = customValues or {}
+	if type(customValues) ~= "table" then customValues = {} end
 
-	-- initialize common useful values
-	local event = {
-		state = e.eCombatResult,
-		multihit = (e.bMultiHit or false),
-		damage = (e.nDamageAmount or 0) + (e.nAbsorption or 0) + (e.nShield or 0),
-		typology = "undefined",
-		heal = (e.nHealAmount or 0),
-		overheal = (e.nOverheal or 0),
-		owner = e.unitCasterOwner,
-		targetkilled = e.bTargetKilled,
-		selfDamage = false,
-		dot = e.bPeriodic
-	}
+	-- initialize common useful values if not already forced in the customValues argument
+	-- unfortunately, I cannot use the form "x or default" to assign this as a false value will be overridden by the default value, and I want only the nils to be overridden
+	if customValues.state == nil then customValues.state = e.eCombatResult end
+	if customValues.multihit == nil then customValues.multihit = (e.bMultiHit or false) end
+	if customValues.damage == nil then customValues.damage = (e.nDamageAmount or 0) + (e.nAbsorption or 0) + (e.nShield or 0) end
+	if customValues.typology == nil then customValues.typology = "undefined" end
+	if customValues.heal == nil then customValues.heal = (e.nHealAmount or 0) end
+	if customValues.overheal == nil then customValues.overheal = (e.nOverheal or 0) end
+	if customValues.owner == nil then customValues.owner = e.unitCasterOwner end
+	if customValues.targetkilled == nil then customValues.targetkilled = e.bTargetKilled end
+	if customValues.dot == nil then customValues.dot = e.bPeriodic end
 
 	-- add info about the caster
 	if e.unitCaster then
-		event.caster = e.unitCaster
-		event.casterId = e.unitCaster:GetId()
-		event.casterName = e.unitCaster:GetName()
+		if customValues.caster == nil then customValues.caster = e.unitCaster end
+		if customValues.casterId == nil then customValues.casterId = e.unitCaster:GetId() end
+		if customValues.casterName == nil then customValues.casterName = e.unitCaster:GetName() end
 	end
-
+	
 	-- add info about the target
 	if e.unitTarget then
-		event.target = e.unitTarget
-		event.targetId = e.unitTarget:GetId()
-		event.targetName = e.unitTarget:GetName()
+		if customValues.target == nil then customValues.target = e.unitTarget end
+		if customValues.targetId == nil then customValues.targetId = e.unitTarget:GetId() end
+		if customValues.targetName == nil then customValues.targetName = e.unitTarget:GetName() end
 	end
-
+	
 	-- add info on the spell itself
 	if e.splCallingSpell then
-		event.spell = e.splCallingSpell
-		if event.dot then
-			event.name = e.splCallingSpell:GetName() .. " (dot)"
+		if customValues.dot then
+			if customValues.name == nil then customValues.name = e.splCallingSpell:GetName() .. " (dot)" end
 		else
-			event.name = e.splCallingSpell:GetName()
+			if customValues.name == nil then customValues.name = e.splCallingSpell:GetName() end
 		end
 	end
-
+	
 	-- add pet info
-	if event.owner then
-		event.ownerId = event.owner:GetId()
-		event.ownerName = event.owner:GetName()
+	if customValues.owner then
+		if customValues.ownerId == nil then customValues.ownerId = customValues.owner:GetId() end
+		if customValues.ownerName == nil then customValues.ownerName = customValues.owner:GetName() end
 	end
-
-	event.__index = event
-	setmetatable(customValues, event)
 	
 	-- checks if the skill is a self damaging skill
-	if customValues.typology == "damage" and customValues.target and customValues.caster and customValues.targetId == customValues.casterId then
-		customValues.selfDamage = true
+	if customValues.typology == "damage" and customValues.casterId ~= nil and customValues.targetId == customValues.casterId then
+		if customValues.selfDamage == nil then customValues.selfDamage = true end
+	elseif customValues.selfDamage == nil then
+		customValues.selfDamage = false
 	end
-
+	
 	if _G.DarkMeter.Development then
 		table.insert(CombatUtils.formattedSkills, 1, customValues)
-		-- CombatUtils.formattedSkills[11] = nil
+		CombatUtils.formattedSkills[101] = nil
 		SendVarToRover("formattedSkill", customValues)
 		SendVarToRover("10formattedSkills", CombatUtils.formattedSkills)
 	end
+	
 	return customValues
 end
 
 -- add the caster or the target of a skill, if a group member is involved (is the caster or the target)
-function CombatUtils:addUnitsToFight(skill)
+function CombatUtils.addUnitsToFight(skill)
 	for _, fight in pairs({currentFight, overallFight}) do
 
 		-- process a skill's caster
@@ -667,8 +677,10 @@ function CombatUtils:addUnitsToFight(skill)
 				-- add pet
 				fight.groupMembers[skill.ownerId]:addPet(skill.caster)
 			
-			-- the caster is an enemy (this is not completely true, let's take the case where another friendly player heals you and he is not grouped with you, he will be added as an enemy but since his contribution to your damage received is 0, he'll never appear among the enemies)
+			-- TODO the caster is an enemy (this is not completely true, let's take the case where another friendly player heals you and he is not grouped with you, he will be added as an enemy but since his contribution to your damage received is 0, he'll never appear among the enemies)
 			else
+				-- enemies...
+
 				-- if is an enemy's pet
 				if skill.ownerId ~= nil then
 					-- add pet's owner
@@ -700,6 +712,8 @@ function CombatUtils:addUnitsToFight(skill)
 
 			-- if the caster or the caster's owner is not a group member, then the spell's target is an
 			else
+				-- enemies...
+
 				-- if is an enemy's pet
 				if targetOwner then
 					-- add pet's owner
@@ -716,7 +730,7 @@ function CombatUtils:addUnitsToFight(skill)
 end
 
 -- adds the skill casted to the caster
-function CombatUtils:addSkillToUnit(skill)
+function CombatUtils.addSkillToUnit(skill)
 	for _, fight in pairs({currentFight, overallFight}) do
 		if fight.groupMembers[skill.casterId] ~= nil then
 			fight.groupMembers[skill.casterId]:addSkill(skill)
@@ -732,6 +746,7 @@ function CombatUtils:addSkillToUnit(skill)
 		-- I'll leave those lines commented here, maybe I can implement this in a future, but I don't think this can be an useful feature outside arenas
 		-- elseif fight.enemies[skill.casterId] ~= nil then
 		-- 	fight.enemies[skill.casterId]:addSkill(skill)
+		-- I chose to ignore pet's skills taken, as is not relevant what damaging skill or heals a pet receives
 		if fight.groupMembers[skill.targetId] ~= nil then
 			fight.groupMembers[skill.targetId]:addSkillTaken(skill)
 		end
@@ -739,17 +754,17 @@ function CombatUtils:addSkillToUnit(skill)
 end
 
 -- process formatted skill action
-function CombatUtils:processFormattedSkill(skill)
+function CombatUtils.processFormattedSkill(skill)
 	-- TODO skill.targetKilled will probably add the skill and unit only to the overall fight
 	-- as the currentFight should already be archived
 	if Group:inCombat() or skill.targetkilled or DarkMeter.settings.alwaysCapture then			-- usually the combat ends before the last damage gets processed
 		-- process the skill only if the a group member or a group member's pet is involved
 		if Group.members[skill.casterId] ~= nil or ( skill.ownerId ~= nil and Group.members[skill.ownerId] ~= nil ) or (skill.targetId ~= nil and Group.members[skill.targetId] ~= nil) then
-			CombatUtils:addUnitsToFight(skill)								-- adds this unit to the currentFight if not already added
-			CombatUtils:addSkillToUnit(skill)									-- adds the casted skill to the caster
-			CombatUtils:updateCurrentFight()
+			CombatUtils.addUnitsToFight(skill)								-- adds this unit to the currentFight if not already added
+			CombatUtils.addSkillToUnit(skill)									-- adds the casted skill to the caster
+			-- CombatUtils.updateCurrentFight()
 			UI.needsUpdate = true
-			DarkMeter:updateUI()			
+			-- DarkMeter:updateUI()
 		end
 	end
 end
@@ -848,10 +863,10 @@ function DarkMeter:OnCombatLogDamage(e)
 	if _G.DarkMeter.Development then
 		Print("DAMEIG!")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		typology = "damage"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 -- This event fires whenever an attack gets a Multi-Hit proc.
@@ -859,42 +874,42 @@ function DarkMeter:OnCombatLogMultiHit(e)
 	if _G.DarkMeter.Development then
 		Print("MultiHit!")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		multihit = true,
 		typology = "damage"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 function DarkMeter:OnCombatLogHeal(e)
 	if _G.DarkMeter.Development then 
 		Print("Heal") 
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		typology = "healing"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 function DarkMeter:OnCombatLogMultiHeal(e)
 	if _G.DarkMeter.Development then
 		Print("MultiHeal!")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		multihit = true,
 		typology = "healing"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 function DarkMeter:OnCombatLogDeflect(e)
 	if _G.DarkMeter.Development then
 		Print("deflect...")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		typology = "damage"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 -- handles transference (skills that deals damage AND heals the user such as stalker's nano field)
@@ -903,16 +918,16 @@ function DarkMeter:OnCombatLogTransference(e)
 		Print("Log Transference")
 	end
 
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		typology = "damage"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 
 	if e.tHealData then
 		for i = 1, #e.tHealData do
 			-- create a new spell and process it separately to consider the healing effect
 			-- this spell has most of its values taken from its damaging portion
-			local healEffect = CombatUtils:formatCombatAction(e.tHealData[i], {
+			local healEffect = CombatUtils.formatCombatAction(e.tHealData[i], {
 				state = e.eCombatResult,
 				owner = e.unitCasterOwner,
 				caster = skill.caster,
@@ -930,7 +945,7 @@ function DarkMeter:OnCombatLogTransference(e)
 				overheal = e.tHealData[i].nOverheal,
 				heal = e.tHealData[i].nHealAmount
 			})
-			CombatUtils:processFormattedSkill(healEffect)
+			CombatUtils.processFormattedSkill(healEffect)
 		end
 	end
 
@@ -940,13 +955,13 @@ function DarkMeter:OnCombatLogCCState(e)
 	if _G.DarkMeter.Development then
 		Print("CC <--")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		interrupts = e.nInterruptArmorHit
 	})
 
 	if not e.bRemoved and e.nInterruptArmorHit > 0 then
 		skill.typology = "ccEffect"
-		CombatUtils:processFormattedSkill(skill)
+		CombatUtils.processFormattedSkill(skill)
 	end
 end
 
@@ -955,12 +970,12 @@ function DarkMeter:OnCombatLogMultiHitShields(e)
 	if _G.DarkMeter.Development then
 		Print("Multihit! Absorbed!")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		multihit = true,
 		typology = "damage",
 		damage = e.nShield,		-- for this event, the damages, being completely absorbed, are equal to the shield drained
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 -- This event fires whenever a player gets fallng damages
@@ -968,14 +983,14 @@ function DarkMeter:OnCombatLogFallingDamage(e)
 	if _G.DarkMeter.Development then
 		Print("Falling Damage")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		target = e.unitCaster,
 		targetId = e.unitCaster:GetId(),
 		fallingDamage = true,
 		name = "Falling damage",
 		typology = "damage"
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 -- This event fires whenever an attack is completely absorbed by shields.
@@ -983,11 +998,11 @@ function DarkMeter:OnCombatLogDamageShields(e)
 	if _G.DarkMeter.Development then
 		Print("DAMEIG! Absorbed!")
 	end
-	local skill = CombatUtils:formatCombatAction(e, {
+	local skill = CombatUtils.formatCombatAction(e, {
 		typology = "damage",
 		damage = e.nShield,		-- for this event, the damages, being completely absorbed, are equal to the shield drained
 	})
-	CombatUtils:processFormattedSkill(skill)
+	CombatUtils.processFormattedSkill(skill)
 end
 
 -- This event fires whenever a spell is reflected back on its caster.

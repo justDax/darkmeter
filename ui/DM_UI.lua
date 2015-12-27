@@ -321,6 +321,7 @@ function UI:showDataForFight(fight)
   
   -- limit updates, updating the ui on every combatlog event kills fps
   if UI.needsUpdate and ( GameLib.GetGameTime() - UI.lastUpdate ) >= 0.3 then
+    UI.needsUpdate = false
     MainForm:showGroupStats()
 
     -- updates PlayerDetails if opened
@@ -330,8 +331,6 @@ function UI:showDataForFight(fight)
         UI.PlayerDetails:setPlayer(UI.lastFight.groupMembers[id])
       end
     end
-
-    UI.needsUpdate = false
   end
 end
 

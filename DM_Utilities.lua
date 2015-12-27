@@ -50,12 +50,7 @@ end
 
 
 function DMUtils:GetSpellIconByName(spellName)
-  for name, icon in pairs(Icons) do
-    if name == spellName then
-      return icon
-    end
-  end
-  return nil
+  return Icons[spellName]
 end
 
 

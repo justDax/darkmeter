@@ -290,7 +290,7 @@ end
 
 
 -- returns the options to update a single bar texts, icons, color, data etc...
-function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
+function MainForm:formatRowOptions(unit, column, rank, maxVal, fightStat)
   local stats = DarkMeter.settings.selectedStats
   local options = {}
 
@@ -298,23 +298,35 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
   options.unit = {
     id = unit.id,
     name = unit.name,
-    pet = unit.pet
+    pet = unit.pet,
+    stat = stats[column]
   }
 
-  -- set rank
-  if rank ~= nil and column == 1 then
-    options.rank = rank
+  if column == 1 then
+    -- set rank
+    if rank ~= nil then
+      options.rank = rank
+    else
+      options.rank = false
+    end
+
+    -- set icon
+    options.icon = DMUtils:iconForClass(unit)
+
+    -- set name
+    options.name = unit.name
+    if unit.pet then
+      local owner = UI.lastFight.groupMembers[unit.ownerId]
+      if owner then
+        options.name = options.name .. " (" .. owner.name .. ")"
+      end
+    end
   else
     options.rank = false
-  end
-
-  -- set icon
-  if column == 1 then
-    options.icon = DMUtils:iconForClass(unit)
-  else
     options.icon = false
+    options.name = false
   end
-
+  
   -- set background
   options.background = ApolloColor.new("99555555")
   if DMUtils.classes[unit.classId] ~= nil then
@@ -322,48 +334,27 @@ function MainForm:formatRowOptions(unit, tempFight, column, maxVal, rank)
     options.background = ApolloColor.new(bg[1], bg[2], bg[3], 0.3)
   end
 
-  -- set name
-  if column == 1 then
-    options.name = unit.name
-    if unit.pet then
-      local owner = tempFight.groupMembers[unit.ownerId]
-      if owner then
-        options.name = options.name .. " (" .. owner.name .. ")"
-      end
-    end
-  else
-    options.name = false
-  end
+
   --| update bar data | --
   
-  local i = column
-
+  local value = unit[stats[column]](unit)
   
-
-  if unit[stats[i]] == nil then
-    Apollo.AddAddonErrorText(DarkMeter, "Unit class has no method: " .. stats[i])
-  elseif tempFight[stats[i]] == nil then
-    Apollo.AddAddonErrorText(DarkMeter, "Fight class has no method: " .. stats[i])
+  -- sets bar text
+  local num = DMUtils.formatNumber( value, 0 , DarkMeter.settings.shortNumberFormat )
+  -- enable percentage only for the first column, if the value is bigger than 0 and is not the DPS stat
+  if column == 1 and value > 0 and stats[column] ~= "dps" then
+    local percent = DMUtils.roundToNthDecimal( (value / fightStat * 100), 1 )
+    options.text = num .. " (" .. percent .. "%)"
   else
-    local value = unit[stats[i]](unit)
-    
-    -- sets bar text
-    local num = DMUtils.formatNumber( value, 1 , DarkMeter.settings.shortNumberFormat )
-    -- enable percentage only for the first column, if the value is bigger than 0 and is not the DPS stat
-    if column == 1 and value > 0 and DarkMeter.settings.selectedStats[column] ~= "dps" then
-      local percent = DMUtils.roundToNthDecimal( value / tempFight[stats[i]](tempFight) * 100, 1 )
-      options.text = num .. " (" .. percent .. "%)"
-    else
-      options.text = num
-    end
-    -- sets bar width
-    if maxVal > 0 then
-      local percentage = value / maxVal * 100
-      options.width = math.floor( self.colWidth[i] * percentage / 100 )
-    else
-      options.width = 0
-    end
-    
+    options.text = num
+  end
+  
+  -- sets bar width
+  if column == 1 and maxVal > 0 then
+    local percentage = value / maxVal * 100
+    options.width = math.floor( self.colWidth[column] * percentage / 100 )
+  else
+    options.width = 0
   end
 
   --| end update bar data | --
@@ -423,15 +414,17 @@ function MainForm:showGroupStats()
         maxVal = math.max(maxVal, orderedUnits[i][stats[index]](orderedUnits[i]) )
       end
 
-      MainForm.cols[index] = MainForm.cols[index] or {}
-      MainForm.cols[index].rows = MainForm.cols[index].rows or {}
+      if not MainForm.cols[index] then MainForm.cols[index] = {} end
+      if not MainForm.cols[index].rows then MainForm.cols[index].rows = {} end
+
+      local fightStat = UI.lastFight[stats[index]](UI.lastFight)
 
       for i = 1, #orderedUnits do
         if MainForm.cols[index].rows[i] == nil then
           MainForm.cols[index].rows[i] = UI.Row:new(MainForm.cols[index].column, i + 1)
           rowsNumberChanged = true --  a new row has been added and I need to recalculate col heights
         end
-        local options = MainForm:formatRowOptions(orderedUnits[i], UI.lastFight, index, maxVal, i)
+        local options = MainForm:formatRowOptions(orderedUnits[i], index, i, maxVal, fightStat)
         MainForm.cols[index].rows[i]:update(options)
       end
 
@@ -525,7 +518,22 @@ end
 function MainForm.controls:OnRowMouseEnter(wndH, wndC, x, y)
   if wndH == wndC then
     local data = wndH:GetData()
-    local unit = data.unit
+    -- find unit
+    local unit = nil
+      
+    if data.pet then
+      for id, u in pairs(UI.lastFight.groupMembers) do
+        for petName, petUnit in pairs(u.pets) do
+          if data.name == petName then
+            unit = petUnit
+            break
+          end
+        end
+      end
+    else
+      unit = UI.lastFight.groupMembers[data.id]
+    end
+
     local stat = data.stat
     local totalStat = unit[stat](unit)
     local lines = {}

@@ -51,7 +51,6 @@ end
 function ResetForm.controls:OnOk()
   ResetForm:hide()
   UI:resetData()
-
 end
 
 -- just closes the reset form

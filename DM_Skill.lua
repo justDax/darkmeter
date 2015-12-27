@@ -1,11 +1,23 @@
 
 local Skill = {}
 local DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
+local DarkMeter
+
+-- skill result codes
+local deflectCode = GameLib.CodeEnumCombatResult.Avoid
+local critCode = GameLib.CodeEnumCombatResult.Critical
+local hitCode = GameLib.CodeEnumCombatResult.Hit
 
 
 function Skill:new()
+  if DarkMeter == nil then
+    DarkMeter = Apollo.GetAddon("DarkMeter")    
+  end
   local initialValues = {
     name = "",
+    fightId = nil,              -- key to retrieve the fight that this skill belongs to in the table DarkMeter.fights
+    unitId = nil,               -- key to retrieve the unit that this skill belongs to in the table DarkMeter.units
+    skillTaken = false,         -- false if this is a skill casted by the unit
     damage = {
       deflects = 0,
       total = 0,
@@ -30,6 +42,26 @@ function Skill:new()
   self.__index = self
   return setmetatable(initialValues, self)
 end
+
+-- returns the fight that this skill blongs to
+function Skill:fight()
+  local fight = DarkMeter.fights[self.fightId]
+  if fight == nil then
+    Apollo.AddAddonErrorText(DarkMeter, "Cannot find global fight with id: " .. tostring(self.fightId) .. " - DarkMeter: " .. tostring(DarkMeter))
+  end
+  return fight
+end
+
+-- returns the unit that this skill blongs to
+function Skill:unit()
+  local unit = DarkMeter.units[self.unitId]
+  if unit == nil then
+    Apollo.AddAddonErrorText(DarkMeter, "Cannot find global unit with id: " .. tostring(self.unitId) .. " - DarkMeter: " .. tostring(DarkMeter))
+  end
+  return unit
+end
+
+
 
 
 -- adds new input to the current skill
@@ -56,9 +88,10 @@ function Skill:add(formattedSkill)
   if (self.icon == nil or self.icon == "") then
     local icon = DMUtils:GetSpellIconByName(self.originalName or self.name)
 
-    if (icon == nil or icon == "") and formattedSkill.spell then
-      icon = formattedSkill.spell:GetIcon()
-    end
+    -- TODO commented this because I'm trying to remove the original spell table from the formattedskill
+    -- if (icon == nil or icon == "") and formattedSkill.spell then
+    --   icon = formattedSkill.spell:GetIcon()
+    -- end
     
     self.icon = icon or false -- if icon is nil, a false value as fallback will prevent from searching the icon again on the next add
   end
@@ -106,29 +139,51 @@ function Skill:ProcessDamage(skill)
   end
 
   -- deflect
-  if skill.state == GameLib.CodeEnumCombatResult.Avoid then
+  if skill.state == deflectCode then
     self.damage.deflects = self.damage.deflects + 1
     -- if the deflected hit is a multihit, I have to keep track of the multihits counts, but I must also eliminate the deflects from the average, max and min damage calculations
     -- I'll add the special value false to the array of multihits damages, this value will be ignored when calcumating a skill's max, min and avg damage
     if skill.multihit then
-      table.insert(self.damage.multihits, false)
+      self.damage.multihits[#self.damage.multihits + 1] = false
     end
   -- crit
-  elseif skill.state == GameLib.CodeEnumCombatResult.Critical then
+  elseif skill.state == critCode then
     if skill.multihit then
-      table.insert(self.damage.multicrits, skill.damage)
+      self.damage.multicrits[#self.damage.multicrits + 1] = skill.damage
     else
-      table.insert(self.damage.crits, skill.damage)
+      self.damage.crits[#self.damage.crits + 1] = skill.damage
     end
+    -- add the damage to itself
     self.damageDone = self.damageDone + skill.damage
+    -- add the damage to the skill's fight
+    local fight = self:fight()
+    local unit = self:unit()
+    if fight and unit and not unit.enemy then
+      if self.skillTaken then
+        fight.damageTakenTotal = fight.damageTakenTotal + skill.damage
+      else
+        fight.damageDoneTotal = fight.damageDoneTotal + skill.damage
+      end
+    end
   -- normal hit
-  elseif skill.state == GameLib.CodeEnumCombatResult.Hit then
+  elseif skill.state == hitCode then
     if skill.multihit then
-      table.insert(self.damage.multihits, skill.damage)
+      self.damage.multihits[#self.damage.multihits + 1] = skill.damage
     else
-      table.insert(self.damage.hits, skill.damage)
+      self.damage.hits[#self.damage.hits + 1] = skill.damage
     end
+    -- add the damage to itself
     self.damageDone = self.damageDone + skill.damage
+    -- add the damage to the skill's fight
+    local fight = self:fight()
+    local unit = self:unit()
+    if fight and unit and not unit.enemy then
+      if self.skillTaken then
+        fight.damageTakenTotal = fight.damageTakenTotal + skill.damage
+      else
+        fight.damageDoneTotal = fight.damageDoneTotal + skill.damage
+      end
+    end
   end
 end
 
@@ -139,35 +194,58 @@ function Skill:ProcessHeal(skill)
     self.heals.total = self.heals.total + 1
   end
   
+  local tmpSkill = {}
+  tmpSkill.heal = skill.heal
+  tmpSkill.oHeal = skill.overheal
 
   -- crit
-  if skill.state == GameLib.CodeEnumCombatResult.Critical then
+  if skill.state == critCode then
     if skill.multihit then
-      table.insert(self.heals.multicrits, {heal = skill.heal, oHeal = skill.overheal})
+      self.heals.multicrits[#self.heals.multicrits + 1] = tmpSkill
     else
-      table.insert(self.heals.crits, {heal = skill.heal, oHeal = skill.overheal})
+      self.heals.crits[#self.heals.crits + 1] = tmpSkill
     end
   -- normal hit
-  elseif skill.state == GameLib.CodeEnumCombatResult.Hit then
+  elseif skill.state == hitCode then
     if skill.multihit then
-      table.insert(self.heals.multihits, {heal = skill.heal, oHeal = skill.overheal})
+      self.heals.multihits[#self.heals.multihits + 1] = tmpSkill
     else
-      table.insert(self.heals.hits, {heal = skill.heal, oHeal = skill.overheal})
+      self.heals.hits[#self.heals.hits + 1] = tmpSkill
     end
   end
 
   self.healingDone = self.healingDone + skill.heal
   self.overhealDone = self.overhealDone + skill.overheal
+  -- adds healings to the skill's fight
+  local fight = self:fight()
+  local unit = self:unit()
+  if fight and unit and not unit.enemy and not self.skillTaken then
+    -- don't process healing taken as they should be added to the global count by the caster
+    fight.healingDoneTotal = fight.healingDoneTotal + skill.heal
+    fight.overhealDoneTotal = fight.overhealDoneTotal + skill.overheal
+  end
 end
 
 
 function Skill:ProcessCC(skill)
   self.interrupts = self.interrupts + skill.interrupts
+  -- adds interrupts the skill's fight
+  local fight = self:fight()
+  local unit = self:unit()
+  if fight and unit and not unit.enemy and not self.skillTaken then
+    fight.interruptsTotal = fight.interruptsTotal + skill.interrupts
+  end
 end
 
 
 function Skill:ProcessFallingDamage(skill)
   self.damageDone = self.damageDone + skill.damage
+
+  local fight = self:fight()
+  local unit = self:unit()
+  if fight and unit and not unit.enemy and self.skillTaken then
+    fight.damageTakenTotal = fight.damageTakenTotal + skill.damage
+  end
 end
 
 
@@ -298,13 +376,13 @@ for _, st in pairs({"damageDone", "healingDone", "overhealDone", "rawhealDone"})
         for _, amount in pairs(v) do
           if amount ~= false then
             if st == "damageDone" then
-              table.insert(arr, amount) 
+              arr[#arr + 1] = amount
             elseif st == "healingDone" then
-              table.insert(arr, amount.heal)
+              arr[#arr + 1] = amount.heal
             elseif st == "overhealDone" then
-              table.insert(arr, amount.oHeal)
+              arr[#arr + 1] = amount.oHeal
             elseif st == "rawhealDone" then
-              table.insert(arr, (amount.heal + amount.oHeal))
+              arr[#arr + 1] = (amount.heal + amount.oHeal)
             end
           end
         end
@@ -329,13 +407,13 @@ for _, st in pairs({"damageDone", "healingDone", "overhealDone", "rawhealDone"})
         for _, amount in pairs(v) do
           if amount ~= false then
             if st == "damageDone" then
-              table.insert(arr, amount) 
+              arr[#arr + 1] = amount
             elseif st == "healingDone" then
-              table.insert(arr, amount.heal)
+              arr[#arr + 1] = amount.heal
             elseif st == "overhealDone" then
-              table.insert(arr, amount.oHeal)
+              arr[#arr + 1] = amount.oHeal
             elseif st == "rawhealDone" then
-              table.insert(arr, (amount.heal + amount.oHeal))
+              arr[#arr + 1] = (amount.heal + amount.oHeal)
             end
           end
         end

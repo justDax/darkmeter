@@ -12,18 +12,22 @@ local Unit = {}
 local Skill = Apollo.GetPackage("DarkMeter:Skill").tPackage
 local DarkMeter
 local DMUtils = Apollo.GetPackage("DarkMeter:Utils").tPackage
+local unitTableIndex = 0
 
 -- wsUnit is a wildstar Unit, check the api for more infos on the Unit API Type
 function Unit:new(wsUnit)
-  DarkMeter = Apollo.GetAddon("DarkMeter")
+  if DarkMeter == nil then
+    DarkMeter = Apollo.GetAddon("DarkMeter")
+  end
+  unitTableIndex = unitTableIndex + 1
 
   local unit = {}
-  unit.wsUnit = wsUnit -- keep reference to wildstar api Unit
   unit.id = wsUnit:GetId()
   unit.level = wsUnit:GetLevel()
   unit.rank = wsUnit:GetRank()
   unit.classId = wsUnit:GetClassId()
   unit.name = wsUnit:GetName()
+  unit.fightId = nil              -- key to retrieve the fight that this unit belongs to in the table DarkMeter.fights
   unit.inCombat = wsUnit:IsInCombat()
   unit.skills = {}          -- all skill casted by that unit, key is the skill name, and the value is a Skill instance
   unit.damagingSkillsTaken = {}     -- all skills casted from enemies to the unit (storead as: {enemyName = {skillname = Skill, skillname2 = skill2}})
@@ -33,6 +37,8 @@ function Unit:new(wsUnit)
   unit.lastActionTimestamp = nil        -- timestamp of the last action, used to calc dps
   unit.pets = {}            -- table:  key = pet name, value = Unit instance
   unit.lastTenDamagingSkillsTaken = {} -- array of skills stored as formattedSkill NOT as a skill instance! used for death recap
+  unit.enemy = false
+  unit.customId = unitTableIndex  -- unfortunately, in this case the id key was already in use and have to do this to reference the global units table
 
   -- if the unit has an owner is a pet
   if wsUnit:GetUnitOwner() then
@@ -44,7 +50,9 @@ function Unit:new(wsUnit)
   end
 
   self.__index = self
-  return setmetatable(unit, self)
+  setmetatable(unit, self)
+  DarkMeter.units[unit.customId] = unit
+  return unit
 end
 
 
@@ -104,8 +112,14 @@ end
 function Unit:addSkill(skill)
   -- special condition, ignore falling damage, as it gets added also as skilltaken
   if not skill.selfDamage then
+    -- expire cached values
+    self:expireCache()
+
     if not self.skills[skill.name] then
-      self.skills[skill.name] = Skill:new()
+      local tmpSkill = Skill:new()
+      tmpSkill.fightId = self.fightId
+      tmpSkill.unitId = self.customId
+      self.skills[skill.name] = tmpSkill
     end
     self.skills[skill.name]:add(skill)
     self.lastActionTimestamp = GameLib.GetGameTime()
@@ -115,6 +129,9 @@ end
 
 -- adds a skill taken from an enemy
 function Unit:addSkillTaken(skill)
+  -- expire cached values
+  self:expireCacheSkillsTaken()
+
   -- process damage taken
   if skill.typology == "damage" then
     local name = skill.fallingDamage == true and "Gravity" or skill.casterName
@@ -123,7 +140,11 @@ function Unit:addSkillTaken(skill)
       self.damagingSkillsTaken[name] = {}
     end
     if not self.damagingSkillsTaken[name][skill.name] then
-      self.damagingSkillsTaken[name][skill.name] = Skill:new()
+      local tmpSkill = Skill:new()
+      tmpSkill.fightId = self.fightId
+      tmpSkill.unitId = self.customId
+      tmpSkill.skillTaken = true
+      self.damagingSkillsTaken[name][skill.name] = tmpSkill
     end
     self.damagingSkillsTaken[name][skill.name]:add(skill)
     -- add to the last 10 damage taken
@@ -161,13 +182,18 @@ end
 
 -- returns damage taken
 function Unit:damageTaken()
-  local total = 0
-  for enemy, skills in pairs(self.damagingSkillsTaken) do
-    for skillName, skill in pairs(skills) do
-      total = total + skill.damageDone
+  -- if tere's no cached value, calculate it and set cache
+  if self.damageTakenCached == nil then
+    local total = 0
+    for enemy, skills in pairs(self.damagingSkillsTaken) do
+      for skillName, skill in pairs(skills) do
+        total = total + skill.damageDone
+      end
     end
+    self.damageTakenCached = total
   end
-  return total
+  -- return cached value
+  return self.damageTakenCached
 end
 
 
@@ -175,17 +201,22 @@ local stats = {"damageDone", "healingDone", "overhealDone", "interrupts", "rawhe
 
 -- define functions to return the stats in this array, since they share the same logic
 for i = 1, #stats do
-  Unit[stats[i]] = function(unit)
-    local total = 0
-    for k, skill in pairs(unit.skills) do
-      total = total + skill:dataFor(stats[i])
-    end
-    if DarkMeter.settings.mergePets then
-      for n, pet in pairs(unit.pets) do
-        total = total + pet[stats[i]](pet)
+  Unit[stats[i]] = function(self)
+    -- if there's no cached value, calculate it and cache it
+    if self[stats[i] .. "Cached"] == nil then
+      local total = 0
+      for k, skill in pairs(self.skills) do
+        total = total + skill:dataFor(stats[i])
       end
+      if DarkMeter.settings.mergePets then
+        for n, pet in pairs(self.pets) do
+          total = total + pet[stats[i]](pet)
+        end
+      end
+      self[stats[i] .. "Cached"] = total
     end
-    return total
+    -- return cached value
+    return self[stats[i] .. "Cached"]
   end
 end
 
@@ -223,7 +254,7 @@ for i = 1, #stats do
     for k, skill in pairs(skills) do
       local amount = skill:dataFor(stats[i])
       if amount > 0 then
-        table.insert(tmp, skill)
+        tmp[#tmp + 1] = skill
       end
     end
 
@@ -233,7 +264,7 @@ for i = 1, #stats do
         for k, skill in pairs(pet.skills) do
           local amount = skill:dataFor(stats[i])
           if amount > 0 then
-            table.insert(tmp, skill)
+            tmp[#tmp + 1] = skill
           end
         end
       end
@@ -257,7 +288,7 @@ function Unit:damageTakenSkills()
    for enemy, skills in pairs(self.damagingSkillsTaken) do
     for skillName, skill in pairs(skills) do
       if skill.damageDone > 0 then
-        table.insert(tmp, skill)
+        tmp[#tmp + 1] = skill
       end  
     end
   end
@@ -280,7 +311,10 @@ function Unit:damageTakenOrderedByEnemies()
     for skillName, skill in pairs(skills) do
       skilltotal = skilltotal + skill.damageDone
     end
-    table.insert(tmp, {name = enemy, damage = skilltotal})
+    local tmpDmg = {}
+    tmpDmg.name = enemy
+    tmpDmg.damage = skilltotal
+    tmp[#tmp + 1] = tmpDmg
   end
   
 
@@ -398,5 +432,20 @@ function Unit:statsPercentages(sStat)
   end
 end
 
+
+-- sets all the cached values to nil
+-- this function is called whenever a skill is added to the unit
+function Unit:expireCache()
+  self.damageDoneCached = nil
+  self.healingDoneCached = nil
+  self.overhealDoneCached = nil
+  self.interruptsCached = nil
+  self.rawhealDoneCached = nil
+end
+
+-- this function is called whenever a skilltaken is added to the unit
+function Unit:expireCacheSkillsTaken()
+  self.damageTakenCached = nil
+end
 
 Apollo.RegisterPackage(Unit, "DarkMeter:Unit", 1, {"DarkMeter:Skill"})
